@@ -9,7 +9,7 @@ fork := true
 lazy val root = (project in file("."))
   .settings(
     name := "pixel-crack",
-    libraryDependencies ++= scalatest ++ cats ++ fs2
+    libraryDependencies ++= scalatest ++ cats ++ fs2 ++ zio
   )
 
 lazy val scalatest: Seq[ModuleID] = Seq(
@@ -31,5 +31,14 @@ lazy val fs2: Seq[ModuleID] = {
 
   Seq(
     "fs2-core", "fs2-io"
+  ).map(group %%  _ % version)
+}
+
+lazy val zio: Seq[ModuleID] = {
+  val group = "dev.zio"
+  val version = "1.0.0-RC17"
+
+  Seq(
+    "zio", "zio-streams"
   ).map(group %%  _ % version)
 }

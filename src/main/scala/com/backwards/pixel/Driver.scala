@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ConcurrentLinkedQueue, ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit}
 import scala.jdk.CollectionConverters._
 import scala.util.Random
+import zio.{UIO, ZIO, App, ZEnv}
 
 /** A simple (and dependency-free) driver to provide intuition for how the
   * controller might be called in an example production environment. NOTE, the
@@ -106,31 +107,65 @@ object Driver extends App {
   val executor   = new ScheduledThreadPoolExecutor(tPoolSize)
   val config     = Config.Static(Math.PI, Int.MaxValue)
 
-  val driver: Driver = new Driver(
-    new Controller(config, _),
-    elapsedMs,
-    playersPerSec  = 100,
-    meanGameMs     = 30 * 1000,
-    tickMs         = tickRateMs,
-    gamesPerPlayer = 20
-  )
+  /*val driver = for {
+    controller <- Controller(config)
+    driver <- UIO(
+      new Driver(
+        controller,
+        elapsedMs,
+        playersPerSec  = 100,
+        meanGameMs     = 30 * 1000,
+        tickMs         = tickRateMs,
+        gamesPerPlayer = 20
+      )
+    )
+  } yield driver
 
-  // Run this crazy thing ...
-  val fx: ScheduledFuture[_] = executor.scheduleAtFixedRate(driver, 0, tickRateMs, TimeUnit.MILLISECONDS)
+  println("here.....")
+  driver.map(schedule).run*/
 
-  Runtime.getRuntime.addShutdownHook(new Thread {
-     override def run(): Unit = {
-       fx.cancel(true)
-       executor.shutdown()
-     }
-   })
 
-  private def elapsedMs(): Int = {
+  def run(args: List[String]): ZIO[ZEnv, Nothing, Int] = {
+    val driver: ZIO[Any, Nothing, Unit] = for {
+      controller <- Controller(config)
+      driver <- UIO(
+        new Driver(
+          controller,
+          elapsedMs(System.currentTimeMillis()),
+          playersPerSec  = 100,
+          meanGameMs     = 30 * 1000,
+          tickMs         = tickRateMs,
+          gamesPerPlayer = 20
+        )
+      )
+    } yield {
+      schedule(driver)
+      ()
+    }
+
+    println("here.....")
+    //driver.foldM(_ => ZIO.succeed(1), _ => ZIO.succeed(0)) //.fold(_ => 1, _ => 0)
+    driver. .flatMap(_ => ZIO.succeed(0))
+  }
+
+  private def schedule(driver: Driver): Driver = {
+    // Run this crazy thing ...
+    val fx: ScheduledFuture[_] = executor.scheduleAtFixedRate(driver, 0, tickRateMs, TimeUnit.MILLISECONDS)
+
+    sys addShutdownHook {
+      fx.cancel(true)
+      executor.shutdown()
+    }
+
+    driver
+  }
+
+  private def elapsedMs(executionStart: Long): () => Int = {
     val v = System.currentTimeMillis() - executionStart
 
     if (v > Int.MaxValue)
       throw new AssertionError("This simulation has been running too long ...")
 
-    v.toInt
+    () => v.toInt
   }
 }
