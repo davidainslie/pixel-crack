@@ -9,5 +9,27 @@ fork := true
 lazy val root = (project in file("."))
   .settings(
     name := "pixel-crack",
-    libraryDependencies += "org.scalatest" %% "scalatest" % "3.1.0"
+    libraryDependencies ++= scalatest ++ cats ++ fs2
   )
+
+lazy val scalatest: Seq[ModuleID] = Seq(
+  "org.scalatest" %% "scalatest" % "3.1.0" % Test
+)
+
+lazy val cats: Seq[ModuleID] = {
+  val group = "org.typelevel"
+  val version = "2.0.0"
+
+  Seq(
+    "cats-core", "cats-effect"
+  ).map(group %%  _ % version)
+}
+
+lazy val fs2: Seq[ModuleID] = {
+  val group = "co.fs2"
+  val version = "2.1.0"
+
+  Seq(
+    "fs2-core", "fs2-io"
+  ).map(group %%  _ % version)
+}
