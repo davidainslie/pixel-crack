@@ -4,21 +4,20 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ConcurrentLinkedQueue, ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit}
 import scala.jdk.CollectionConverters._
 import scala.util.Random
-import zio.{DefaultRuntime, UIO}
 
 /** A simple (and dependency-free) driver to provide intuition for how the
-  * controller might be called in an example production environment. NOTE, the
-  * below is not representative of the type or style of solution we're looking
-  * for. We also do not evaluate your solution using this driver and recommend
-  * you do not rely on it for testing, evaluation, etc. */
+ * controller might be called in an example production environment. NOTE, the
+ * below is not representative of the type or style of solution we're looking
+ * for. We also do not evaluate your solution using this driver and recommend
+ * you do not rely on it for testing, evaluation, etc. */
 class Driver(
-    cf: (Output => Unit) => Controller,
-    ellapsedMs: () => Int,
-    playersPerSec: Double,
-    meanGameMs: Int,
-    tickMs: Double,
-    gamesPerPlayer: Int
-) extends Runnable {
+              cf: (Output => Unit) => Controller,
+              ellapsedMs: () => Int,
+              playersPerSec: Double,
+              meanGameMs: Int,
+              tickMs: Double,
+              gamesPerPlayer: Int
+            ) extends Runnable {
 
   val controller: Controller = cf(push)
   val games: ConcurrentLinkedQueue[Match] = new ConcurrentLinkedQueue[Match]
@@ -101,21 +100,32 @@ object Driver extends App {
   val tickRateMs = 5000
 
   // How many concurrent executions to allow? This would only be a factor if the per-tick execution is slower than the tick rate.
-  val tPoolSize = 2
+  val tPoolSize  = 2
 
-  val config = Config.Static(Math.PI, Int.MaxValue)
+  // Setup controller, etc.
+  val executor   = new ScheduledThreadPoolExecutor(tPoolSize)
+  val config     = Config.Static(Math.PI, Int.MaxValue)
 
-  val schedule: Driver => Unit = { driver =>
-    val executor = new ScheduledThreadPoolExecutor(tPoolSize)
-    val fx: ScheduledFuture[_] = executor.scheduleAtFixedRate(driver, 0, tickRateMs, TimeUnit.MILLISECONDS)
+  val driver: Driver = new Driver(
+    new Controller(config, _),
+    elapsedMs,
+    playersPerSec  = 100,
+    meanGameMs     = 30 * 1000,
+    tickMs         = tickRateMs,
+    gamesPerPlayer = 20
+  )
 
-    sys addShutdownHook {
+  // Run this crazy thing ...
+  val fx: ScheduledFuture[_] = executor.scheduleAtFixedRate(driver, 0, tickRateMs, TimeUnit.MILLISECONDS)
+
+  Runtime.getRuntime.addShutdownHook(new Thread {
+    override def run(): Unit = {
       fx.cancel(true)
       executor.shutdown()
     }
-  }
+  })
 
-  val elapsedMs: () => Int = { () =>
+  private def elapsedMs(): Int = {
     val v = System.currentTimeMillis() - executionStart
 
     if (v > Int.MaxValue)
@@ -123,22 +133,4 @@ object Driver extends App {
 
     v.toInt
   }
-
-  val program = for {
-    controller <- Controller(config)
-    driver <- UIO(
-      new Driver(
-        controller,
-        elapsedMs,
-        playersPerSec  = 100,
-        meanGameMs     = 30 * 1000,
-        tickMs         = tickRateMs,
-        gamesPerPlayer = 20
-      )
-    )
-  } yield schedule(driver)
-
-  val runtime = new DefaultRuntime {}
-
-  runtime.unsafeRun(program)
 }
