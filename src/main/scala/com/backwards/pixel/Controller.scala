@@ -74,7 +74,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
   def findMatch(waiting: Waiting, matchingScore: Score): Option[Match] =
     atomic(implicit txn =>
       waitingPlayers.get(matchingScore).map(_.filterNot(_ == waiting)).flatMap(_.collectFirst {
-        case w @ Waiting(potentialPlayer, _) if !waiting.player.played.contains(potentialPlayer) => w
+        case w: Waiting if !waiting.player.played.contains(w.player) => w
       })
     ).fold(unmatched(waiting))(createMatch(waiting) andThen Option.apply)
 
