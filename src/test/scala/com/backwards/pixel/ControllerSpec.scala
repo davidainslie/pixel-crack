@@ -14,14 +14,17 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
 
   val controller = new Controller(Config.Static(0, 0), _ => ())
 
+  val `5 elapsed ms`: () => Int =
+    () => 5
+
   val `player 1 beginner`: Waiting =
-    Waiting(Player(ID(1)(() => 5), Score(0)))
+    Waiting(Player(ID(1, `5 elapsed ms`), Score(0)), `5 elapsed ms`)
 
   val `player 2 beginner`: Waiting =
-    Waiting(Player(ID(2)(() => 5), Score(0)))
+    Waiting(Player(ID(2, `5 elapsed ms`), Score(0)), `5 elapsed ms`)
 
   val `player 3 advanced`: Waiting =
-    Waiting(Player(ID(2)(() => 5), Score(3)))
+    Waiting(Player(ID(2, `5 elapsed ms`), Score(3)), `5 elapsed ms`)
 
   "Controller" should {
     "receive players in waiting" in {

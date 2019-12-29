@@ -3,12 +3,8 @@ package com.backwards.pixel
 import cats.Order
 
 /** A player ID. */
-final case class ID(value: Long)(val elapsedMs: () => Int) {
-  def expired: Boolean = {
-    val elapsed = elapsedMs()
-    println(s"===> ID elapse check = $elapsed")
-    elapsed > value
-  }
+final case class ID(value: Long, elapsedMs: () => Int) {
+  def expired: Boolean = elapsedMs() > value
 }
 
 object ID {
