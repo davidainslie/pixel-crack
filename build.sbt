@@ -9,11 +9,15 @@ fork := true
 lazy val root = (project in file("."))
   .settings(
     name := "pixel-crack",
-    libraryDependencies ++= scalatest ++ cats ++ monocle ++ monix ++ stm
+    libraryDependencies ++= scalatest ++ scalamock ++ cats ++ monocle ++ monix ++ stm
   )
 
 lazy val scalatest: Seq[ModuleID] = Seq(
   "org.scalatest" %% "scalatest" % "3.1.0" % Test
+)
+
+lazy val scalamock: Seq[ModuleID] = Seq(
+  "org.scalamock" %% "scalamock" % "4.4.0" % Test
 )
 
 lazy val cats: Seq[ModuleID] = {

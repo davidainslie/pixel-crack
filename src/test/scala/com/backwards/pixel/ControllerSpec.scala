@@ -1,15 +1,12 @@
 package com.backwards.pixel
 
-import org.scalatest.matchers.must.Matchers
-import org.scalatest.wordspec.AnyWordSpec
+import cats.implicits._
 import monix.execution.schedulers.TestScheduler
 import org.scalatest.OneInstancePerTest
-import monocle.macros.syntax.lens._
-import cats.implicits._
+import org.scalatest.matchers.must.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 
 class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
-  spec =>
-
   implicit val scheduler: TestScheduler = TestScheduler()
 
   val config: Config.Static =
@@ -20,20 +17,20 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
 
   val controller = new Controller(config, noSideEffect)
 
-  val `elapsed < maxWaitMs`: () => Int =
-    () => config.maxWaitMs - 1
+  val `0 elapsed ms`: () => Int =
+    () => 0
 
-  val `elapsed > maxWaitMs`: () => Int =
-    () => `elapsed < maxWaitMs`() * 2 + config.maxWaitMs
+  val `> maxWaitMs elapsed`: () => Int =
+    () => config.maxWaitMs + 1
 
   val `player 1 beginner`: Player =
-    Player(ID(1, `elapsed < maxWaitMs`), Score(0))
+    Player(ID(1, `0 elapsed ms`), Score(0))
 
   val `player 2 beginner`: Player =
-    Player(ID(2, `elapsed < maxWaitMs`), Score(0))
+    Player(ID(2, `0 elapsed ms`), Score(0))
 
   val `player 3 advanced`: Player =
-    Player(ID(3, `elapsed < maxWaitMs`), Score(3))
+    Player(ID(3, `0 elapsed ms`), Score(3))
 
   "Controller" should {
     "receive players in waiting" in {
@@ -80,12 +77,12 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
     }
 
     "match overdue player in waiting to another player of different score" in {
-      //val `player 3 advanced` = spec.`player 3 advanced`.lens(_.id.elapsedMs).set(`elapsed > maxWaitMs`)
+      val `player 3 advanced waiting` = Waiting(`player 3 advanced`, 0, `> maxWaitMs elapsed`)
 
       controller receive Waiting(`player 1 beginner`)
-      controller receive Waiting(`player 3 advanced`, `elapsed > maxWaitMs`)
+      controller receive `player 3 advanced waiting`
 
-      controller.findMatch(Waiting(`player 3 advanced`), `player 3 advanced`.score) mustBe Option(Match(`player 1 beginner`, `player 3 advanced`))
+      controller.findMatch(`player 3 advanced waiting`, `player 3 advanced`.score) mustBe Option(Match(`player 1 beginner`, `player 3 advanced`))
     }
   }
 }

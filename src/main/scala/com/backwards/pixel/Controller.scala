@@ -73,7 +73,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
    */
   def findMatch(waiting: Waiting, matchingScore: Score): Option[Match] =
     atomic(implicit txn =>
-      waitingPlayers.get(matchingScore).map(_.filterNot(_ == waiting)).flatMap(_.collectFirst {
+      waitingPlayers.get(matchingScore).map(_.filterNot(_.player == waiting.player)).flatMap(_.collectFirst {
         case w: Waiting if !waiting.player.played.contains(w.player) => w
       })
     ).fold(unmatched(waiting, matchingScore))(createMatch(waiting) andThen Option.apply)
@@ -86,7 +86,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
   }
 
   def unmatched(waiting: Waiting, matchingScore: Score): Option[Match] = {
-    if (waiting.elapsedMs() - waiting.startedWaitingMs > config.maxWaitMs)
+    if (waiting.elapsedMs() - waiting.startedMs > config.maxWaitMs)
       matchingScore.decrement.flatMap(findMatch(waiting, _))
     else
       None
