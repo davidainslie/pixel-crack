@@ -17,19 +17,19 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
   val `5 elapsed ms`: () => Int =
     () => 5
 
-  val `player 1 beginner`: Waiting =
-    Waiting(Player(ID(1, `5 elapsed ms`), Score(0)), `5 elapsed ms`)
+  val `player 1 beginner`: Player =
+    Player(ID(1, `5 elapsed ms`), Score(0))
 
-  val `player 2 beginner`: Waiting =
-    Waiting(Player(ID(2, `5 elapsed ms`), Score(0)), `5 elapsed ms`)
+  val `player 2 beginner`: Player =
+    Player(ID(2, `5 elapsed ms`), Score(0))
 
-  val `player 3 advanced`: Waiting =
-    Waiting(Player(ID(2, `5 elapsed ms`), Score(3)), `5 elapsed ms`)
+  val `player 3 advanced`: Player =
+    Player(ID(3, `5 elapsed ms`), Score(3))
 
   "Controller" should {
     "receive players in waiting" in {
-      controller receive `player 1 beginner`
-      controller receive `player 2 beginner`
+      controller receive Waiting(`player 1 beginner`)
+      controller receive Waiting(`player 2 beginner`)
 
       controller.waitingPlayersSnapshot.size mustEqual 1
       controller.waitingPlayersSnapshot(Score(0)).size mustEqual 2
@@ -43,31 +43,31 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
     }*/
 
     "match player in waiting to another of equal score (lower ID comes first in a Match)" in {
-      controller receive `player 1 beginner`
-      controller receive `player 2 beginner`
+      controller receive Waiting(`player 1 beginner`)
+      controller receive Waiting(`player 2 beginner`)
 
-      controller doMatch `player 1 beginner` mustBe Option(Match(`player 1 beginner`.player, `player 2 beginner`.player))
-      controller doMatch `player 2 beginner` mustBe Option(Match(`player 1 beginner`.player, `player 2 beginner`.player))
+      controller.findMatch(Waiting(`player 1 beginner`), `player 1 beginner`.score) mustBe Option(Match(`player 1 beginner`, `player 2 beginner`))
+      controller.findMatch(Waiting(`player 2 beginner`), `player 2 beginner`.score) mustBe Option(Match(`player 1 beginner`, `player 2 beginner`))
     }
 
     "not match player in waiting as there are no other players" in {
-      controller receive `player 1 beginner`
+      controller receive Waiting(`player 1 beginner`)
 
-      controller doMatch `player 1 beginner` mustBe None
+      controller.findMatch(Waiting(`player 1 beginner`), `player 1 beginner`.score) mustBe None
     }
 
     "not match non overdue player in waiting to another player of different score" in {
-      controller receive `player 1 beginner`
-      controller receive `player 3 advanced`
+      controller receive Waiting(`player 1 beginner`)
+      controller receive Waiting(`player 3 advanced`)
 
-      controller doMatch `player 3 advanced` mustBe None
+      controller.findMatch(Waiting(`player 3 advanced`), `player 3 advanced`.score) mustBe None
     }
 
     "match overdue player in waiting to another player of different score" in {
-      controller receive `player 1 beginner`
-      controller receive `player 3 advanced`
+      controller receive Waiting(`player 1 beginner`)
+      controller receive Waiting(`player 3 advanced`)
 
-      controller doMatch `player 3 advanced` mustBe Option(Match(`player 1 beginner`.player, `player 3 advanced`.player))
+      controller.findMatch(Waiting(`player 3 advanced`), `player 3 advanced`.score) mustBe Option(Match(`player 1 beginner`, `player 3 advanced`))
     }
   }
 }

@@ -54,7 +54,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
       w <- OptionT.liftF(ws)
     } yield {
       println(w)
-      doMatch(w)
+      findMatch(w, w.player.score)
       ws
     }
 
@@ -64,25 +64,31 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
   }
 
   /**
-   * Matching a player in waiting first tries for a player of equal score.
+   * Matching a player in waiting first tries for a player of equal score (as provided by matchingScore).
    * If none is available but a player has exceeded their wait time,
-   * then look for players of lesser score.
+   * then look for players of lesser score (as provided by matchingScore.
    * @param waiting Waiting
+   * @param matchingScore Score
    * @return Option[Match
    */
-  def doMatch(waiting: Waiting): Option[Match] = {
-    val player = waiting.player
-
-    atomic { implicit txn =>
-      waitingPlayers.get(waiting.player.score).map(_.filterNot(_ == waiting)).flatMap(_.collectFirst {
-        case w @ Waiting(potentialPlayer, _) if !player.played.contains(potentialPlayer) => w
+  def findMatch(waiting: Waiting, matchingScore: Score): Option[Match] =
+    atomic(implicit txn =>
+      waitingPlayers.get(matchingScore).map(_.filterNot(_ == waiting)).flatMap(_.collectFirst {
+        case w @ Waiting(potentialPlayer, _) if !waiting.player.played.contains(potentialPlayer) => w
       })
-    } map { matchedWaiting =>
-      if (player.id <= matchedWaiting.player.id)
-        Match(player, matchedWaiting.player)
-      else
-        Match(matchedWaiting.player, player)
-    }
+    ).fold(unmatched(waiting))(createMatch(waiting) andThen Option.apply)
+
+  def createMatch(waiting: Waiting): Waiting => Match = { matchedWaiting =>
+    if (waiting.player.id <= matchedWaiting.player.id)
+      Match(waiting.player, matchedWaiting.player)
+    else
+      Match(matchedWaiting.player, waiting.player)
+  }
+
+  def unmatched(waiting: Waiting): Option[Match] = {
+    //if (waiting.elapsedMs() - waiting.startedWaitingMs >= config.maxWaitMs)
+
+    None
   }
 }
 

@@ -52,11 +52,11 @@ class Driver(
             GameCompleted(winner = b, a)
           }
 
-          controller.receive(msg)
+          controller receive msg
 
-          if (!a.expired) controller.receive(Waiting(a, elapsedMs))
+          if (!a.expired) controller receive Waiting(a)
 
-          if (!b.expired) controller.receive(Waiting(b, elapsedMs))
+          if (!b.expired) controller receive Waiting(b)
 
         // Possible as games may have changed from the assignment of `q`
         case null => ()
@@ -81,7 +81,7 @@ class Driver(
     val t: Int = elapsedMs() + gamesPerPlayer * meanGameMs
     val player = Player(ID(i.toLong << 32 | t & 0xFFFFFFFFL, elapsedMs), Score(0))
 
-    Waiting(player, elapsedMs)
+    Waiting(player)
   }
 
   private def probabilisticRound(input: Double): Int = {
