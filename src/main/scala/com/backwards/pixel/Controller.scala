@@ -12,6 +12,7 @@ import monix.execution.{CancelableFuture, Scheduler}
 import scala.concurrent.duration._
 import scala.concurrent.stm._
 import scala.runtime.RichInt
+import cats.data.OptionT
 import cats.implicits._
 
 /** We presume this `Controller` is managed somehow such that it is instantiated,
@@ -22,8 +23,7 @@ import cats.implicits._
 class Controller(config: Config, out: Output => Unit)(implicit scheduler: Scheduler) {
   private val highestScore = Ref(Score(0))
 
-  // TODO - Should this be a TMap ???
-  private val waitingPlayers: TMap[Score, Set[Waiting]] = TMap.empty[Score, Set[Waiting]]
+  private val waitingPlayers: TMap[Score, List[Waiting]] = TMap.empty[Score, List[Waiting]]
 
   val matching: CancelableFuture[Nothing] = Task {
     println("Hi")
@@ -42,8 +42,8 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
     case w: Waiting =>
       atomic { implicit txn =>
         waitingPlayers.updateWith(w.player.score) {
-          case None => Option(Set(w))
-          case waiting => waiting.map(_ + w)
+          case None => Option(List(w))
+          case waiting => waiting.map(_ :+ w)
         }
 
         Option.when(w.player.score > highestScore())(highestScore() = w.player.score)
@@ -52,22 +52,41 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
       }
   }
 
-  def waitingPlayersSnapshot: Map[Score, Set[Waiting]] =
+  def waitingPlayersSnapshot: Map[Score, List[Waiting]] =
     atomic { implicit txn =>
       waitingPlayers.snapshot
     }
 
   def doMatch(): Option[Match] = {
-    val (waiting, score) = atomic { implicit txn =>
+    val (waiting, startingScore) = atomic { implicit txn =>
       (waitingPlayers.snapshot, highestScore())
     }
 
-    for {
-      s <- (score to Score(0) by -1)
-      ws <- waiting.get(Score(s))
+    val v = for {
+      s <- OptionT.liftF((startingScore.value to 0 by -1).toList.map(Score.apply))
+      ws <- OptionT.fromOption[List](waiting.get(s))
+      w <- OptionT.liftF(ws)
+    } yield {
+      println(w)
+      doMatch(w)
+      ws
     }
 
+    println(v.value)
+
     ???
+  }
+
+  def doMatch(waiting: Waiting): Option[Match] = {
+    val player = waiting.player
+
+    val v = atomic { implicit txn =>
+      waitingPlayers.get(waiting.player.score).flatMap(_.collectFirst {
+        case w @ Waiting(potentialPlayer) if !player.played.contains(potentialPlayer) => w
+      })
+    }
+
+    v
   }
 }
 
