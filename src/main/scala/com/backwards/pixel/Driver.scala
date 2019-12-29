@@ -13,7 +13,7 @@ import monix.execution.Scheduler.{global => scheduler}
  * you do not rely on it for testing, evaluation, etc. */
 class Driver(
   cf: (Output => Unit) => Controller,
-  ellapsedMs: () => Int,
+  elapsedMs: () => Int,
   playersPerSec: Double,
   meanGameMs: Int,
   tickMs: Double,
@@ -54,9 +54,9 @@ class Driver(
 
           controller.receive(msg)
 
-          if (!a.expired) controller.receive(Waiting(a))
+          if (!a.expired) controller.receive(Waiting(a, elapsedMs()))
 
-          if (!b.expired) controller.receive(Waiting(b))
+          if (!b.expired) controller.receive(Waiting(b, elapsedMs()))
 
         // Possible as games may have changed from the assignment of `q`
         case null => ()
@@ -78,9 +78,9 @@ class Driver(
     // We overload the player ID as an expiry instant so we don't have to keep
     // track of it separately; and, we use the sequence number `i` as a means of
     // discriminating players who would otherwise expire at the same instant.
-    val t: Int = ellapsedMs() + gamesPerPlayer * meanGameMs
+    val t: Int = elapsedMs() + gamesPerPlayer * meanGameMs
 
-    Waiting(Player(ID(i.toLong << 32 | t & 0xFFFFFFFFL)(ellapsedMs), Score(0)))
+    Waiting(Player(ID(i.toLong << 32 | t & 0xFFFFFFFFL)(elapsedMs), Score(0)), elapsedMs())
   }
 
   private def probabilisticRound(input: Double): Int = {

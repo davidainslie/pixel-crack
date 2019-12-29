@@ -9,7 +9,7 @@ fork := true
 lazy val root = (project in file("."))
   .settings(
     name := "pixel-crack",
-    libraryDependencies ++= scalatest ++ cats ++ monix ++ stm
+    libraryDependencies ++= scalatest ++ cats ++ monocle ++ monix ++ stm
   )
 
 lazy val scalatest: Seq[ModuleID] = Seq(
@@ -22,6 +22,15 @@ lazy val cats: Seq[ModuleID] = {
 
   Seq(
     "cats-core", "cats-effect"
+  ).map(group %%  _ % version)
+}
+
+lazy val monocle: Seq[ModuleID] = {
+  val group = "com.github.julien-truffaut"
+  val version = "2.0.0"
+
+  Seq(
+    "monocle-core", "monocle-macro"
   ).map(group %%  _ % version)
 }
 

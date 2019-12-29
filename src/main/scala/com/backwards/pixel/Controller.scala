@@ -1,19 +1,13 @@
 package com.backwards.pixel
 
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
-import scala.collection.concurrent.TrieMap
 import scala.collection.Map
-import scala.collection.Map
-import cats.Id
-import cats.effect.IO
-import monix.eval.Task
-import monix.execution.{CancelableFuture, Scheduler}
-import scala.concurrent.duration._
 import scala.concurrent.stm._
-import scala.runtime.RichInt
 import cats.data.OptionT
 import cats.implicits._
+import monix.eval.Task
+import monix.execution.{CancelableFuture, Scheduler}
+import monocle.Prism
+import monocle.macros.syntax.lens._
 
 /** We presume this `Controller` is managed somehow such that it is instantiated,
  * receives input somehow, and can appropriately process the output. The config
@@ -25,28 +19,20 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
 
   private val waitingPlayers: TMap[Score, List[Waiting]] = TMap.empty[Score, List[Waiting]]
 
-  val matching: CancelableFuture[Nothing] = Task {
-    println("Hi")
-    doMatch()
-  }.executeAsync.doOnCancel(Task(println("Matching ended"))).loopForever.runToFuture
-
-
-  // Over to you ...
-  /*def receive(in: Input): Unit = {
-    // println(s"Received $in")
-
-    println(s"===> Controller: received = $in")
-  }*/
+  val matching: CancelableFuture[Nothing] =
+    Task(doMatch()).executeAsync.loopForever.runToFuture
 
   val receive: Input => Unit = {
-    case w: Waiting =>
+    case waiting: Waiting =>
       atomic { implicit txn =>
-        waitingPlayers.updateWith(w.player.score) {
-          case None => Option(List(w))
-          case waiting => waiting.map(_ :+ w)
+        waitingPlayers.updateWith(waiting.player.score) {
+          case None => Option(List(waiting))
+          case w => w.map(_ :+ waiting)
         }
 
-        Option.when(w.player.score > highestScore())(highestScore() = w.player.score)
+        Option.when(waiting.player.score > highestScore()) {
+          highestScore() = waiting.player.score
+        }
 
         println(waitingPlayers.mkString("\n"))
       }
@@ -77,16 +63,26 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
     ???
   }
 
+  /**
+   * Matching a player in waiting first tries for a player of equal score.
+   * If none is available but a player has exceeded their wait time,
+   * then look for players of lesser score.
+   * @param waiting Waiting
+   * @return Option[Match
+   */
   def doMatch(waiting: Waiting): Option[Match] = {
     val player = waiting.player
 
-    val v = atomic { implicit txn =>
-      waitingPlayers.get(waiting.player.score).flatMap(_.collectFirst {
-        case w @ Waiting(potentialPlayer) if !player.played.contains(potentialPlayer) => w
+    atomic { implicit txn =>
+      waitingPlayers.get(waiting.player.score).map(_.filterNot(_ == waiting)).flatMap(_.collectFirst {
+        case w @ Waiting(potentialPlayer, _) if !player.played.contains(potentialPlayer) => w
       })
+    } map { matchedWaiting =>
+      if (player.id <= matchedWaiting.player.id)
+        Match(player, matchedWaiting.player)
+      else
+        Match(matchedWaiting.player, player)
     }
-
-    v
   }
 }
 
