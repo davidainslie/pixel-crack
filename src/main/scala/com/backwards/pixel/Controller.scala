@@ -76,7 +76,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
       waitingPlayers.get(matchingScore).map(_.filterNot(_ == waiting)).flatMap(_.collectFirst {
         case w: Waiting if !waiting.player.played.contains(w.player) => w
       })
-    ).fold(unmatched(waiting))(createMatch(waiting) andThen Option.apply)
+    ).fold(unmatched(waiting, matchingScore))(createMatch(waiting) andThen Option.apply)
 
   def createMatch(waiting: Waiting): Waiting => Match = { matchedWaiting =>
     if (waiting.player.id <= matchedWaiting.player.id)
@@ -85,10 +85,11 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
       Match(matchedWaiting.player, waiting.player)
   }
 
-  def unmatched(waiting: Waiting): Option[Match] = {
-    //if (waiting.elapsedMs() - waiting.startedWaitingMs >= config.maxWaitMs)
-
-    None
+  def unmatched(waiting: Waiting, matchingScore: Score): Option[Match] = {
+    if (waiting.elapsedMs() - waiting.startedWaitingMs > config.maxWaitMs)
+      matchingScore.decrement.flatMap(findMatch(waiting, _))
+    else
+      None
   }
 }
 

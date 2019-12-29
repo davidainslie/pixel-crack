@@ -12,19 +12,28 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
 
   implicit val scheduler: TestScheduler = TestScheduler()
 
-  val controller = new Controller(Config.Static(0, 0), _ => ())
+  val config: Config.Static =
+    Config.Static(maxScoreDelta = 0, maxWaitMs = 10)
 
-  val `5 elapsed ms`: () => Int =
-    () => 5
+  val noSideEffect: Output => Unit =
+    _ => ()
+
+  val controller = new Controller(config, noSideEffect)
+
+  val `elapsed < maxWaitMs`: () => Int =
+    () => config.maxWaitMs - 1
+
+  val `elapsed > maxWaitMs`: () => Int =
+    () => `elapsed < maxWaitMs`() * 2 + config.maxWaitMs
 
   val `player 1 beginner`: Player =
-    Player(ID(1, `5 elapsed ms`), Score(0))
+    Player(ID(1, `elapsed < maxWaitMs`), Score(0))
 
   val `player 2 beginner`: Player =
-    Player(ID(2, `5 elapsed ms`), Score(0))
+    Player(ID(2, `elapsed < maxWaitMs`), Score(0))
 
   val `player 3 advanced`: Player =
-    Player(ID(3, `5 elapsed ms`), Score(3))
+    Player(ID(3, `elapsed < maxWaitMs`), Score(3))
 
   "Controller" should {
     "receive players in waiting" in {
@@ -50,6 +59,13 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       controller.findMatch(Waiting(`player 2 beginner`), `player 2 beginner`.score) mustBe Option(Match(`player 1 beginner`, `player 2 beginner`))
     }
 
+    "match player in waiting to another of lesser score (lower ID comes first in a Match)" in {
+      controller receive Waiting(`player 1 beginner`)
+      controller receive Waiting(`player 3 advanced`)
+
+      controller.findMatch(Waiting(`player 3 advanced`), `player 1 beginner`.score) mustBe Option(Match(`player 1 beginner`, `player 3 advanced`))
+    }
+
     "not match player in waiting as there are no other players" in {
       controller receive Waiting(`player 1 beginner`)
 
@@ -64,8 +80,10 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
     }
 
     "match overdue player in waiting to another player of different score" in {
+      //val `player 3 advanced` = spec.`player 3 advanced`.lens(_.id.elapsedMs).set(`elapsed > maxWaitMs`)
+
       controller receive Waiting(`player 1 beginner`)
-      controller receive Waiting(`player 3 advanced`)
+      controller receive Waiting(`player 3 advanced`, `elapsed > maxWaitMs`)
 
       controller.findMatch(Waiting(`player 3 advanced`), `player 3 advanced`.score) mustBe Option(Match(`player 1 beginner`, `player 3 advanced`))
     }

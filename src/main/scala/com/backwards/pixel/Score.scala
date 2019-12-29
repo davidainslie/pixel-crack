@@ -1,10 +1,19 @@
 package com.backwards.pixel
 
-import scala.language.implicitConversions
 import cats.implicits._
 import cats.{Monoid, Order}
 
-case class Score(value: Int) extends AnyVal
+// TODO - Smart constructor or Refined to avoid possible negative
+case class Score(value: Int) extends AnyVal {
+  def decrement: Option[Score] = {
+    val nextValue = value - 1
+
+    if (nextValue >= 0)
+      Option(Score(nextValue))
+    else
+      None
+  }
+}
 
 object Score {
   implicit val scoreMonoid: Monoid[Score] =
