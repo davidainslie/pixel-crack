@@ -38,8 +38,8 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       controller receive Waiting(`player 1 beginner`)
       controller receive Waiting(`player 2 beginner`)
 
-      controller.waitingPlayersSnapshot.size mustEqual 1
-      controller.waitingPlayersSnapshot(`player 1 beginner`.score).size mustEqual 2
+      controller.waitingPlayersSnapshot.size mustBe 1
+      controller.waitingPlayersSnapshot(`player 1 beginner`.score).size mustBe 2
     }
 
     "match player in waiting to another of equal score (and vice versa)" in {
@@ -110,6 +110,8 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
 
   "Controller matching" should {
     "run in background on a scheduler" in {
+      implicit val scheduler: TestScheduler = TestScheduler()
+
       val controller = new Controller(config, noSideEffect) {
         override def doMatch(): List[Match] = throw new Exception("Ran and prematurely ended")
       }
@@ -119,8 +121,30 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       controller.matching.isCompleted mustBe true
     }
 
-    /*"match all waiting players of equal score" in {
+    "match all waiting players of equal score" in {
+      val numberOfScores = 10
+      val numberOfPlayersPerScore = 10
 
-    }*/
+      var blah = 0
+
+      val player: Int => List[Player] = { score =>
+        (1 to numberOfPlayersPerScore).map { _ =>
+          blah = blah + 1
+          Player(ID(blah, `0 elapsed ms`), Score(score))
+        } toList
+      }
+
+      val players = (1 to numberOfScores).flatMap(player).toList
+      players.map(Waiting.apply).foreach(controller.receive)
+
+      controller.waitingPlayersSnapshot.size mustBe numberOfScores
+
+      (1 to numberOfScores).foreach { score =>
+        controller.waitingPlayersSnapshot(Score(score)).size mustBe numberOfPlayersPerScore
+      }
+
+      println(numberOfScores * numberOfPlayersPerScore / 2)
+      controller.doMatch().size mustBe (numberOfScores * numberOfPlayersPerScore / 2)
+    }
   }
 }

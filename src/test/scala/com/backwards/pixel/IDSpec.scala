@@ -15,16 +15,16 @@ class IDSpec extends AnyWordSpec with Matchers {
     "see elapsed milliseconds increment" in {
       val id = ID(1, elapsedMs(1))
 
-      id.elapsedMs() mustEqual 1
-      id.elapsedMs() mustEqual 2
-      id.elapsedMs() mustEqual 3
+      id.elapsedMs() mustBe 1
+      id.elapsedMs() mustBe 2
+      id.elapsedMs() mustBe 3
     }
 
     "expire after elapsed milliseconds exceeds the value of ID" in {
       val id = ID(1, elapsedMs(1))
 
-      id.expired mustEqual false
-      id.expired mustEqual true
+      id.expired mustBe false
+      id.expired mustBe true
     }
   }
 }

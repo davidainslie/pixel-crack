@@ -31,7 +31,8 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
           highestScore() = waiting.player.score
         }
 
-        println(waitingPlayers.mkString("\n"))
+        // TODO
+        // println(waitingPlayers.mkString("\n"))
       }
   }
 
@@ -67,11 +68,18 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
    * @return Option[Match]
    */
   def findMatch(waiting: Waiting, matchingScore: Score): Option[Match] =
-    atomic(implicit txn =>
-      waitingPlayers.get(matchingScore).map(_.filterNot(_.player == waiting.player)).flatMap(_.collectFirst {
-        case w: Waiting if matchAllowed(waiting.player, w.player) => w
-      })
-    ).fold(unmatched(waiting, matchingScore))(createMatch(waiting) andThen Option.apply)
+    atomic { implicit txn =>
+      Option.when(waitingPlayers.get(waiting.player.score).exists(_.contains(waiting))) {
+        waitingPlayers.get(matchingScore).flatMap {
+          _.filterNot(_.player == waiting.player).collectFirst {
+            case w: Waiting if matchAllowed(waiting.player, w.player) => w
+          }
+        }
+      } collectFirstSome {
+        case Some(w) => Option(createMatch(waiting, w))
+        case None => unmatched(waiting, matchingScore)
+      }
+    }
 
   def matchAllowed(player: Player, opponent: Player): Boolean =
     !player.played.contains(opponent) && player.score.difference(opponent.score) <= Score(config.maxScoreDelta.toInt)
@@ -79,9 +87,10 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
   /**
    * Create a Match for two players where the player with lowest ID will be given first in Match(player1, player2)
    * @param waiting Waiting
+   * @param matchedWaiting Waiting
    * @return Match
    */
-  def createMatch(waiting: Waiting): Waiting => Match = { matchedWaiting =>
+  def createMatch(waiting: Waiting, matchedWaiting: Waiting): Match = {
     val newMatch = if (waiting.player.id <= matchedWaiting.player.id)
       Match(waiting.player, matchedWaiting.player)
     else
@@ -96,6 +105,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
       stopWaiting(matchedWaiting)
     }
 
+    println(newMatch)
     newMatch
   }
 
