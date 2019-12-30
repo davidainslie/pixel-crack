@@ -82,10 +82,21 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
    * @return Match
    */
   def createMatch(waiting: Waiting): Waiting => Match = { matchedWaiting =>
-    if (waiting.player.id <= matchedWaiting.player.id)
+    val newMatch = if (waiting.player.id <= matchedWaiting.player.id)
       Match(waiting.player, matchedWaiting.player)
     else
       Match(matchedWaiting.player, waiting.player)
+
+    atomic { implicit txn =>
+      val stopWaiting: Waiting => Unit = { w =>
+        waitingPlayers.updateWith(w.player.score)(_.map(_.filterNot(_ == w)))
+      }
+
+      stopWaiting(waiting)
+      stopWaiting(matchedWaiting)
+    }
+
+    newMatch
   }
 
   def unmatched(waiting: Waiting, matchingScore: Score): Option[Match] = {

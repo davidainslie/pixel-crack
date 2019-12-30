@@ -1,14 +1,11 @@
 package com.backwards.pixel
 
-import java.util.concurrent.TimeUnit
 import cats.implicits._
 import monix.execution.schedulers.TestScheduler
+import monocle.macros.syntax.lens._
 import org.scalatest.OneInstancePerTest
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import monocle.macros.syntax.lens._
-import scala.concurrent.duration._
-import monix.eval.Task
 
 class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
   implicit val scheduler: TestScheduler = TestScheduler()
@@ -36,7 +33,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
   val `player 3 advanced`: Player =
     Player(ID(3, `0 elapsed ms`), Score(3))
 
-  /*"Controller" should {
+  "Controller" should {
     "receive players in waiting" in {
       controller receive Waiting(`player 1 beginner`)
       controller receive Waiting(`player 2 beginner`)
@@ -45,12 +42,21 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       controller.waitingPlayersSnapshot(`player 1 beginner`.score).size mustEqual 2
     }
 
-    "match player in waiting to another of equal score" in {
-      controller receive Waiting(`player 1 beginner`)
-      controller receive Waiting(`player 2 beginner`)
+    "match player in waiting to another of equal score (and vice versa)" in {
+      def findMatch(playerA: Player, playerB: Player): Option[Match] = {
+        controller receive Waiting(playerA)
+        controller receive Waiting(playerB)
 
-      controller.findMatch(Waiting(`player 1 beginner`), `player 1 beginner`.score) mustBe Option(Match(`player 1 beginner`, `player 2 beginner`))
-      controller.findMatch(Waiting(`player 2 beginner`), `player 2 beginner`.score) mustBe Option(Match(`player 1 beginner`, `player 2 beginner`))
+        val foundMatch = controller.findMatch(Waiting(playerA), playerA.score)
+
+        // 2nd call to finding a match will not "match" as the match has already been created
+        controller.findMatch(Waiting(playerA), playerA.score) mustBe None
+
+        foundMatch
+      }
+
+      findMatch(`player 1 beginner`, `player 2 beginner`) mustBe Option(Match(`player 1 beginner`, `player 2 beginner`))
+      findMatch(`player 2 beginner`, `player 1 beginner`) mustBe Option(Match(`player 1 beginner`, `player 2 beginner`))
     }
 
     "match player in waiting to another of lesser score" in {
@@ -92,7 +98,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
 
       controller.findMatch(`player 3 advanced waiting`, `player 3 advanced`.score) mustBe None
     }
-  }*/
+  }
 
 
   /*"match two players of equal score" in {
@@ -112,5 +118,9 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       scheduler.tickOne()
       controller.matching.isCompleted mustBe true
     }
+
+    /*"match all waiting players of equal score" in {
+
+    }*/
   }
 }
