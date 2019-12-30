@@ -2,6 +2,7 @@ package com.backwards.pixel
 
 import cats.implicits._
 import cats.{Monoid, Order}
+import scala.math.abs
 
 // TODO - Smart constructor or Refined to avoid possible negative
 case class Score(value: Int) extends AnyVal {
@@ -13,6 +14,9 @@ case class Score(value: Int) extends AnyVal {
     else
       None
   }
+
+  def difference(other: Score): Score =
+    Score(abs(value - other.value))
 }
 
 object Score {

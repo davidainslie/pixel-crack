@@ -5,12 +5,13 @@ import monix.execution.schedulers.TestScheduler
 import org.scalatest.OneInstancePerTest
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+import monocle.macros.syntax.lens._
 
 class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
   implicit val scheduler: TestScheduler = TestScheduler()
 
   val config: Config.Static =
-    Config.Static(maxScoreDelta = 0, maxWaitMs = 10)
+    Config.Static(maxScoreDelta = 5, maxWaitMs = 10)
 
   val noSideEffect: Output => Unit =
     _ => ()
@@ -38,7 +39,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       controller receive Waiting(`player 2 beginner`)
 
       controller.waitingPlayersSnapshot.size mustEqual 1
-      controller.waitingPlayersSnapshot(Score(0)).size mustEqual 2
+      controller.waitingPlayersSnapshot(`player 1 beginner`.score).size mustEqual 2
     }
 
     /*"match two players of equal score" in {
@@ -48,7 +49,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       controller.doMatch() mustEqual Match(`player 1 expires in 5 milliseconds`, `player 2 expires in 15 milliseconds`)
     }*/
 
-    "match player in waiting to another of equal score (lower ID comes first in a Match)" in {
+    "match player in waiting to another of equal score" in {
       controller receive Waiting(`player 1 beginner`)
       controller receive Waiting(`player 2 beginner`)
 
@@ -56,7 +57,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       controller.findMatch(Waiting(`player 2 beginner`), `player 2 beginner`.score) mustBe Option(Match(`player 1 beginner`, `player 2 beginner`))
     }
 
-    "match player in waiting to another of lesser score (lower ID comes first in a Match)" in {
+    "match player in waiting to another of lesser score" in {
       controller receive Waiting(`player 1 beginner`)
       controller receive Waiting(`player 3 advanced`)
 
@@ -76,13 +77,24 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       controller.findMatch(Waiting(`player 3 advanced`), `player 3 advanced`.score) mustBe None
     }
 
-    "match overdue player in waiting to another player of different score" in {
+    "match overdue player in waiting to another player of lesser score" in {
       val `player 3 advanced waiting` = Waiting(`player 3 advanced`, 0, `> maxWaitMs elapsed`)
 
       controller receive Waiting(`player 1 beginner`)
       controller receive `player 3 advanced waiting`
 
       controller.findMatch(`player 3 advanced waiting`, `player 3 advanced`.score) mustBe Option(Match(`player 1 beginner`, `player 3 advanced`))
+    }
+
+    "not match overdue player in waiting to another of lesser score as the score delta exceeds configured 'maximum score delta'" in {
+      val controller = new Controller(config.lens(_.maxScoreDelta).set(1), noSideEffect)
+
+      val `player 3 advanced waiting` = Waiting(`player 3 advanced`, 0, `> maxWaitMs elapsed`)
+
+      controller receive Waiting(`player 1 beginner`)
+      controller receive `player 3 advanced waiting`
+
+      controller.findMatch(`player 3 advanced waiting`, `player 3 advanced`.score) mustBe None
     }
   }
 }

@@ -69,15 +69,23 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
    * then look for players of lesser score (as provided by matchingScore.
    * @param waiting Waiting
    * @param matchingScore Score
-   * @return Option[Match
+   * @return Option[Match]
    */
   def findMatch(waiting: Waiting, matchingScore: Score): Option[Match] =
     atomic(implicit txn =>
       waitingPlayers.get(matchingScore).map(_.filterNot(_.player == waiting.player)).flatMap(_.collectFirst {
-        case w: Waiting if !waiting.player.played.contains(w.player) => w
+        case w: Waiting if matchAllowed(waiting.player, w.player) => w
       })
     ).fold(unmatched(waiting, matchingScore))(createMatch(waiting) andThen Option.apply)
 
+  def matchAllowed(player: Player, opponent: Player): Boolean =
+    !player.played.contains(opponent) && player.score.difference(opponent.score) <= Score(config.maxScoreDelta.toInt)
+
+  /**
+   * Create a Match for two players where the player with lowest ID will be given first in Match(player1, player2)
+   * @param waiting Waiting
+   * @return Match
+   */
   def createMatch(waiting: Waiting): Waiting => Match = { matchedWaiting =>
     if (waiting.player.id <= matchedWaiting.player.id)
       Match(waiting.player, matchedWaiting.player)
