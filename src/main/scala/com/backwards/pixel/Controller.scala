@@ -2,12 +2,9 @@ package com.backwards.pixel
 
 import scala.collection.Map
 import scala.concurrent.stm._
-import cats.data.OptionT
 import cats.implicits._
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
-import monocle.Prism
-import monocle.macros.syntax.lens._
 
 /** We presume this `Controller` is managed somehow such that it is instantiated,
  * receives input somehow, and can appropriately process the output. The config
@@ -43,24 +40,22 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
       waitingPlayers.snapshot
     }
 
-  def doMatch(): Option[Match] = {
+  def doMatch(): List[Match] = {
+    import cats.data.OptionT
+    import cats.data.OptionT._
+
     val (waiting, startingScore) = atomic { implicit txn =>
       (waitingPlayers.snapshot, highestScore())
     }
 
-    val v = for {
-      s <- OptionT.liftF((startingScore.value to 0 by -1).toList.map(Score.apply))
-      ws <- OptionT.fromOption[List](waiting.get(s))
-      w <- OptionT.liftF(ws)
-    } yield {
-      println(w)
-      findMatch(w, w.player.score)
-      ws
-    }
+    val matches: OptionT[List, Match] = for {
+      s  <- liftF((startingScore.value to 0 by -1).toList.map(Score.apply))
+      ws <- fromOption[List](waiting.get(s))
+      w  <- liftF(ws)
+      m  <- fromOption[List](findMatch(w, w.player.score))
+    } yield m
 
-    println(v.value)
-
-    ???
+    matches.value.flatten
   }
 
   /**

@@ -1,11 +1,14 @@
 package com.backwards.pixel
 
+import java.util.concurrent.TimeUnit
 import cats.implicits._
 import monix.execution.schedulers.TestScheduler
 import org.scalatest.OneInstancePerTest
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import monocle.macros.syntax.lens._
+import scala.concurrent.duration._
+import monix.eval.Task
 
 class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
   implicit val scheduler: TestScheduler = TestScheduler()
@@ -33,7 +36,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
   val `player 3 advanced`: Player =
     Player(ID(3, `0 elapsed ms`), Score(3))
 
-  "Controller" should {
+  /*"Controller" should {
     "receive players in waiting" in {
       controller receive Waiting(`player 1 beginner`)
       controller receive Waiting(`player 2 beginner`)
@@ -41,13 +44,6 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       controller.waitingPlayersSnapshot.size mustEqual 1
       controller.waitingPlayersSnapshot(`player 1 beginner`.score).size mustEqual 2
     }
-
-    /*"match two players of equal score" in {
-      controller.receive(Waiting(`player 1 expires in 5 milliseconds`))
-      controller.receive(Waiting(`player 2 expires in 15 milliseconds`))
-
-      controller.doMatch() mustEqual Match(`player 1 expires in 5 milliseconds`, `player 2 expires in 15 milliseconds`)
-    }*/
 
     "match player in waiting to another of equal score" in {
       controller receive Waiting(`player 1 beginner`)
@@ -95,6 +91,26 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       controller receive `player 3 advanced waiting`
 
       controller.findMatch(`player 3 advanced waiting`, `player 3 advanced`.score) mustBe None
+    }
+  }*/
+
+
+  /*"match two players of equal score" in {
+    controller.receive(Waiting(`player 1 expires in 5 milliseconds`))
+    controller.receive(Waiting(`player 2 expires in 15 milliseconds`))
+
+    controller.doMatch() mustEqual Match(`player 1 expires in 5 milliseconds`, `player 2 expires in 15 milliseconds`)
+  }*/
+
+  "Controller matching" should {
+    "run in background on a scheduler" in {
+      val controller = new Controller(config, noSideEffect) {
+        override def doMatch(): List[Match] = throw new Exception("Ran and prematurely ended")
+      }
+
+      controller.matching.isCompleted mustBe false
+      scheduler.tickOne()
+      controller.matching.isCompleted mustBe true
     }
   }
 }

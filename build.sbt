@@ -9,15 +9,32 @@ fork := true
 lazy val root = (project in file("."))
   .settings(
     name := "pixel-crack",
-    libraryDependencies ++= scalatest ++ scalamock ++ cats ++ monocle ++ monix ++ stm
+    scalacOptions ++= Seq(
+      "-encoding", "utf8",
+      "-deprecation",
+      "-unchecked",
+      "-language:implicitConversions",
+      "-language:higherKinds",
+      "-language:existentials",
+      "-language:postfixOps"
+    ),
+    libraryDependencies ++= scalatest ++ scalatestplus ++ scalacheck ++ scalacheckShapeless ++ cats ++ monocle ++ monix ++ stm
   )
 
 lazy val scalatest: Seq[ModuleID] = Seq(
   "org.scalatest" %% "scalatest" % "3.1.0" % Test
 )
 
-lazy val scalamock: Seq[ModuleID] = Seq(
-  "org.scalamock" %% "scalamock" % "4.4.0" % Test
+lazy val scalatestplus: Seq[ModuleID] = Seq(
+  "org.scalatestplus" %% "scalatestplus-scalacheck" % "3.1.0.0-RC2" % Test
+)
+
+lazy val scalacheck: Seq[ModuleID] = Seq(
+  "org.scalacheck" %% "scalacheck" % "1.14.3" % Test
+)
+
+lazy val scalacheckShapeless: Seq[ModuleID] = Seq(
+  "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % "1.2.3" % Test
 )
 
 lazy val cats: Seq[ModuleID] = {
