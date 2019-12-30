@@ -38,6 +38,33 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       controller receive Waiting(`player 1 beginner`)
       controller receive Waiting(`player 2 beginner`)
 
+      println(s"Waiting snapshot:")
+      println(controller.waitingSnapshot.mkString("\n"))
+      println()
+
+      val (matchings, result) = controller.doMatch().run(Map.empty).value
+
+      println(s"Matchings:")
+      println(matchings.mkString("\n"))
+      println()
+
+      println(s"Waiting snapshot:")
+      println(controller.waitingSnapshot.mkString("\n"))
+      println()
+
+      println(s"Final result:")
+      println(result)
+      println()
+    }
+  }
+
+  /*
+
+
+  "Controller" should {
+    "receive players in waiting" in {
+
+
       controller.waitingPlayersSnapshot.size mustBe 1
       controller.waitingPlayersSnapshot(`player 1 beginner`.score).size mustBe 2
     }
@@ -100,14 +127,6 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
     }
   }
 
-
-  /*"match two players of equal score" in {
-    controller.receive(Waiting(`player 1 expires in 5 milliseconds`))
-    controller.receive(Waiting(`player 2 expires in 15 milliseconds`))
-
-    controller.doMatch() mustEqual Match(`player 1 expires in 5 milliseconds`, `player 2 expires in 15 milliseconds`)
-  }*/
-
   "Controller matching" should {
     "run in background on a scheduler" in {
       implicit val scheduler: TestScheduler = TestScheduler()
@@ -146,5 +165,5 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       println(numberOfScores * numberOfPlayersPerScore / 2)
       controller.doMatch().size mustBe (numberOfScores * numberOfPlayersPerScore / 2)
     }
-  }
+  }*/
 }

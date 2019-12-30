@@ -1,10 +1,16 @@
 package com.backwards.pixel
 
-import scala.collection.Map
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
+import scala.collection.mutable
 import scala.concurrent.stm._
+import cats.Eval
+import cats.data.State
 import cats.implicits._
 import monix.eval.Task
+import monix.execution.atomic.AtomicInt
 import monix.execution.{CancelableFuture, Scheduler}
+import monocle.macros.syntax.lens._
 
 /** We presume this `Controller` is managed somehow such that it is instantiated,
  * receives input somehow, and can appropriately process the output. The config
@@ -12,34 +18,62 @@ import monix.execution.{CancelableFuture, Scheduler}
  * of this controller created per-runtime (but `receive` could be called by
  * multiple parallel threads for instance). */
 class Controller(config: Config, out: Output => Unit)(implicit scheduler: Scheduler) {
-  private val highestScore = Ref(Score(0))
+  type Matchings = Map[Score, List[Waiting]]
+
+  private val waiting = new mutable.Queue[Waiting]
+
+  /*private val highestScore = Ref(Score(0))
 
   private val waitingPlayers: TMap[Score, List[Waiting]] = TMap.empty[Score, List[Waiting]]
 
   val matching: CancelableFuture[Nothing] =
-    Task(doMatch()).executeAsync.loopForever.runToFuture
+    Task(doMatch()).executeAsync.loopForever.runToFuture*/
 
   val receive: Input => Unit = {
-    case waiting: Waiting =>
-      atomic { implicit txn =>
-        waitingPlayers.updateWith(waiting.player.score) {
-          case None => Option(List(waiting))
-          case w => w.map(_ :+ waiting)
-        }
+    case w: Waiting =>
+      waiting enqueue w
 
-        Option.when(waiting.player.score > highestScore()) {
-          highestScore() = waiting.player.score
-        }
-
-        // TODO
-        // println(waitingPlayers.mkString("\n"))
-      }
+      // TODO
+      // println(waitingPlayers.mkString("\n"))
   }
 
-  def waitingPlayersSnapshot: Map[Score, List[Waiting]] =
-    atomic { implicit txn =>
-      waitingPlayers.snapshot
+  def waitingSnapshot: List[Waiting] =
+    waiting.toList
+
+  val temp = new AtomicInteger(0)
+
+  def doMatch(): State[Matchings, String] =
+    for {
+      _ <- State.get[Matchings]
+      blah <- nextMatchings
+      zz <- if (temp.get > 3) State.get[Matchings] else {
+        TimeUnit.SECONDS.sleep(3)
+        doMatch()
+      }
+      //xx <- matchGames
+    } yield blah
+
+  def nextMatchings: State[Matchings, String] =
+    State[Matchings, String] { matchings =>
+      val nextMatchings: Matchings = waiting.dequeueAll(_ => true).foldLeft(matchings) { (matchings, w) =>
+        matchings.updatedWith(w.player.score) {
+          case None => Option(List(w))
+          case waiting => waiting.map(_ :+ w)
+        }
+      }
+
+      println(s"\n ===> Next matchings: $nextMatchings \n")
+      println(s"\n ===> Waiting: $waiting \n")
+      temp.incrementAndGet()
+
+      (nextMatchings, "boo")
     }
+
+  //def matchGames : State[Matchings, String] = ???
+
+  //val v: (GameState, String) = doMatch.run(GameState(Map.empty[Score, Waiting])).value
+
+  /*
 
   def doMatch(): List[Match] = {
     import cats.data.OptionT
@@ -114,7 +148,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
       matchingScore.decrement.flatMap(findMatch(waiting, _))
     else
       None
-  }
+  }*/
 }
 
 object Controller {

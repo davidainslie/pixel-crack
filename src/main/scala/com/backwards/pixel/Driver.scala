@@ -64,8 +64,8 @@ class Driver(
     }
   }
 
-  def stop(): Unit =
-    controller.matching.cancel()
+  /*def stop(): Unit =
+    controller.matching.cancel()*/
 
   // --------------------------------------------------------------------------
 
@@ -124,7 +124,7 @@ object Driver extends App {
 
   sys addShutdownHook {
     fx.cancel(true)
-    driver.stop()
+    //driver.stop()
     executor.shutdown()
   }
 
