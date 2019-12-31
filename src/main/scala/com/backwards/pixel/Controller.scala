@@ -21,7 +21,7 @@ import scala.math._
 class Controller(config: Config, out: Output => Unit)(implicit scheduler: Scheduler) {
   type Triage = Map[Score, List[Waiting]]
 
-  private val waiting = mutable.Queue.empty[Waiting]
+  private val waitingQueue = mutable.Queue.empty[Waiting]
 
   /*private val highestScore = Ref(Score(0))
 
@@ -33,7 +33,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
 
   val receive: Input => Unit = {
     case w: Waiting =>
-      waiting enqueue w
+      waitingQueue enqueue w
 
       // TODO
       // println(waitingPlayers.mkString("\n"))
@@ -47,30 +47,36 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
   //Task(doMatch().run(Map.empty).value).executeAsync.runToFuture
 
 
-  def waitingSnapshot: List[Waiting] =
-    waiting.toList
+  def waitingQueueSnapshot: List[Waiting] =
+    waitingQueue.toList
 
   def doMatch(): State[Triage, List[Match]] =
     for {
       _ <- State.get[Triage]
-      matches <- nextTriage
+      _ <- updateTriage
+      matches <- findMatches
       _ <- if (matching.isCompleted) State.get[Triage] else {
-        TimeUnit.SECONDS.sleep(3)
+        TimeUnit.SECONDS.sleep(3) // TODO - Remove
         doMatch()
       }
     } yield matches
 
-  def nextTriage: State[Triage, List[Match]] =
-    State[Triage, List[Match]] { triage =>
-      val (nextTriage, matches) = findMatches(waiting.dequeueAll(_ => true).foldLeft(triage) { (triage, w) =>
+  def updateTriage: State[Triage, Unit] =
+    State.modify[Triage] { triage =>
+      waitingQueue.dequeueAll(_ => true).foldLeft(triage) { (triage, w) =>
         triage.updatedWith(w.player.score) {
           case None => Option(List(w))
           case waiting => waiting.map(_ :+ w)
         }
-      })
+      }
+    }
+
+  def findMatches: State[Triage, List[Match]] =
+    State[Triage, List[Match]] { triage =>
+      val (nextTriage, matches) = findMatches(triage)
 
       println(s"\n ===> Next triage: $nextTriage \n")
-      println(s"\n ===> Waiting: $waiting \n")
+      println(s"\n ===> Waiting: $waitingQueue \n")
 
       (nextTriage, matches)
     }

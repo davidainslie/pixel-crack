@@ -40,7 +40,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       controller receive Waiting(`player 1 beginner`)
       controller receive Waiting(`player 2 beginner`)
 
-      controller.waitingSnapshot mustBe List(Waiting(`player 1 beginner`), Waiting(`player 2 beginner`))
+      controller.waitingQueueSnapshot mustBe List(Waiting(`player 1 beginner`), Waiting(`player 2 beginner`))
 
       /*println(s"Waiting snapshot:")
       println(controller.waitingSnapshot.mkString("\n"))
@@ -119,7 +119,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       controller receive Waiting(`player 2 beginner`)
 
       println(s"Waiting snapshot:")
-      println(controller.waitingSnapshot.mkString("\n"))
+      println(controller.waitingQueueSnapshot.mkString("\n"))
       println()
 
 
