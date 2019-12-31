@@ -97,41 +97,22 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
   }
 
   def findMatch(waiting: Waiting, triage: Triage): Option[Match] = {
+    val waitingPlayer = waiting.player
+    val sameScoreWaiting: List[Waiting] = triage.getOrElse(waitingPlayer.score, Nil)
 
+    sameScoreWaiting.filterNot(_.player == waitingPlayer).filterNot(_.player.played.contains(waitingPlayer)).headOption match {
+      case Some(w) =>
+        createMatch(waitingPlayer, w.player).some
 
-    val player = waiting.player
-
-    /*def blah: Option[Match] = if (waiting.elapsedMs() - waiting.startedMs <= config.maxWaitMs) {
-      None
-    } else {
-      val lowScore = max(0, waiting.player.score.value - config.maxScoreDelta).toInt
-      val highScore = (waiting.player.score.value + config.maxScoreDelta).toInt
-
-      val scoresBelow = (lowScore until waiting.player.score.value).map(Score.apply).flatMap(triage.get).flatten
-      val scoresAbove = (waiting.player.score.value + 1 to highScore).map(Score.apply).flatMap(triage.get).flatten
-
-      val otherScores: Seq[Waiting] = (scoresBelow ++ scoresAbove).sortWith((w1, w2) => delta(w1) < delta(w2))
-
-      otherScores.headOption.fold(none[Match])(w => createMatch(player, w.player).some)
-    }*/
-
-    // TODO - Sort out this crazy line
-    //triage.getOrElse(player.score, Nil).filterNot(_.player == player).filterNot(_.player.played.contains(player)).headOption.fold(blah)(w => createMatch(player, w.player).some)
-    findMatch(player, triage.getOrElse(player.score, Nil), blahX(waiting, triage))
+      case None =>
+        if (waiting.elapsedMs() - waiting.startedMs <= config.maxWaitMs)
+          None
+        else
+          findMatch(waitingPlayer, triage)
+    }
   }
 
-  def findMatch(player: Player, waiting: List[Waiting], f: Player => Option[Match]): Option[Match] =
-    waiting.filterNot(_.player == player).filterNot(_.player.played.contains(player)).headOption.fold(f(player))(w => createMatch(player, w.player).some)
-
-
-  def blahX(waiting: Waiting, triage: Triage)(player: Player): Option[Match] =
-    if (waiting.elapsedMs() - waiting.startedMs <= config.maxWaitMs)
-      None
-    else
-      blah(player, triage)
-
-
-  def blah(player: Player, triage: Triage): Option[Match] = {
+  def findMatch(player: Player, triage: Triage): Option[Match] = {
     val lowScore = max(0, player.score.value - config.maxScoreDelta).toInt
     val highScore = (player.score.value + config.maxScoreDelta).toInt
 
