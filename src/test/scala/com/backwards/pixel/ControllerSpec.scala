@@ -1,11 +1,13 @@
 package com.backwards.pixel
 
+import java.util.concurrent.TimeUnit
 import cats.implicits._
 import monix.execution.schedulers.TestScheduler
 import monocle.macros.syntax.lens._
 import org.scalatest.OneInstancePerTest
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+import scala.concurrent.duration._
 
 class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
   implicit val scheduler: TestScheduler = TestScheduler()
@@ -38,11 +40,27 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       controller receive Waiting(`player 1 beginner`)
       controller receive Waiting(`player 2 beginner`)
 
-      println(s"Waiting snapshot:")
-      println(controller.waitingSnapshot.mkString("\n"))
-      println()
+      controller.waitingSnapshot mustBe List(Waiting(`player 1 beginner`), Waiting(`player 2 beginner`))
 
-      val (triage, result) = controller.doMatch().run(Map.empty).value
+      /*println(s"Waiting snapshot:")
+      println(controller.waitingSnapshot.mkString("\n"))
+      println()*/
+
+
+
+      /*scheduler.scheduleOnce(7 seconds) {
+        println("Hello, world!")
+        controller.matching.cancel()
+      }*/
+
+      /*scheduler.tickOne()
+
+      println("................ hi")
+
+      TimeUnit.SECONDS.sleep(10)*/
+
+      /*val (triage, matches) = controller.doMatch().run(Map.empty).value
+
 
       println(s"Triage:")
       println(triage.mkString("\n"))
@@ -53,8 +71,65 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       println()
 
       println(s"Final result:")
-      println(result)
+      println(matches)
+      println()*/
+    }
+
+    "not find matches when there are no waiting players" in {
+      controller.findMatches(Map.empty) mustBe (Map.empty, Nil)
+    }
+
+    "not find matches" in {
+      val triage = Map(
+        Score(0) -> List(
+          Waiting(`player 1 beginner`),
+          Waiting(`player 2 beginner`)
+        )
+      )
+
+      controller.findMatches(triage) mustBe (triage, Nil)
+    }
+
+    "not find match" in {
+      val triage = Map(
+        Score(0) -> List(
+          Waiting(`player 1 beginner`),
+          Waiting(`player 2 beginner`)
+        )
+      )
+
+      println("=====> " + controller.findMatch(Waiting(`player 1 beginner`), triage))
+    }
+  }
+
+  "Controller matching" should {
+    "create a match (always in the same order) for two given players" in {
+      val resultingMatch = Match(`player 1 beginner`, `player 2 beginner`)
+
+      controller.createMatch(`player 1 beginner`, `player 2 beginner`) mustBe resultingMatch
+      controller.createMatch(`player 2 beginner`, `player 1 beginner`) mustBe resultingMatch
+    }
+  }
+
+  "Controller matching via scheduler" should {
+    "receive players in waiting" ignore {
+      implicit val scheduler = monix.execution.Scheduler.global
+
+      controller receive Waiting(`player 1 beginner`)
+      controller receive Waiting(`player 2 beginner`)
+
+      println(s"Waiting snapshot:")
+      println(controller.waitingSnapshot.mkString("\n"))
       println()
+
+
+      scheduler.scheduleOnce(7 seconds) {
+        println("Hello, world!")
+        controller.matching.cancel()
+      }
+
+      println("Test waiting.......")
+      TimeUnit.SECONDS.sleep(10)
     }
   }
 

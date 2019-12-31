@@ -11,6 +11,7 @@ import monix.eval.Task
 import monix.execution.atomic.AtomicInt
 import monix.execution.{CancelableFuture, Scheduler}
 import monocle.macros.syntax.lens._
+import scala.math._
 
 /** We presume this `Controller` is managed somehow such that it is instantiated,
  * receives input somehow, and can appropriately process the output. The config
@@ -29,6 +30,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
   val matching: CancelableFuture[Nothing] =
     Task(doMatch()).executeAsync.loopForever.runToFuture*/
 
+
   val receive: Input => Unit = {
     case w: Waiting =>
       waiting enqueue w
@@ -37,41 +39,126 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
       // println(waitingPlayers.mkString("\n"))
   }
 
+  val matching: CancelableFuture[(Triage, List[Match])] =
+    Task {
+      println("===> Begin matching")
+      doMatch().run(Map.empty).value
+    }.executeAsync.runToFuture
+  //Task(doMatch().run(Map.empty).value).executeAsync.runToFuture
+
+
   def waitingSnapshot: List[Waiting] =
     waiting.toList
 
-  val temp = new AtomicInteger(0)
-
-  def doMatch(): State[Triage, String] =
+  def doMatch(): State[Triage, List[Match]] =
     for {
       _ <- State.get[Triage]
-      blah <- nextTriage
-      zz <- if (temp.get > 3) State.get[Triage] else {
+      matches <- nextTriage
+      _ <- if (matching.isCompleted) State.get[Triage] else {
         TimeUnit.SECONDS.sleep(3)
         doMatch()
       }
-      //xx <- matchGames
-    } yield blah
+    } yield matches
 
-  def nextTriage: State[Triage, String] =
-    State[Triage, String] { triage =>
-      val nextTriage: Triage = waiting.dequeueAll(_ => true).foldLeft(triage) { (triage, w) =>
+  def nextTriage: State[Triage, List[Match]] =
+    State[Triage, List[Match]] { triage =>
+      val (nextTriage, matches) = findMatches(waiting.dequeueAll(_ => true).foldLeft(triage) { (triage, w) =>
         triage.updatedWith(w.player.score) {
           case None => Option(List(w))
           case waiting => waiting.map(_ :+ w)
         }
-      }
+      })
 
       println(s"\n ===> Next triage: $nextTriage \n")
       println(s"\n ===> Waiting: $waiting \n")
-      temp.incrementAndGet()
 
-      (nextTriage, "boo")
+      (nextTriage, matches)
     }
 
-  //def matchGames : State[Matchings, String] = ???
+  def findMatches(triage: Triage): (Triage, List[Match]) = {
+    val waiting = triage.values.flatten.toList.sortWith(_.player.score > _.player.score)
+    findMatches(waiting, triage)
+  }
 
-  //val v: (GameState, String) = doMatch.run(GameState(Map.empty[Score, Waiting])).value
+  def findMatches(waiting: List[Waiting], triage: Triage, matches: List[Match] = Nil): (Triage, List[Match]) = {
+    waiting match {
+      case w +: rest => findMatch(w, triage).fold(findMatches(rest, triage, matches)) { newMatch =>
+        val stopWaiting: Player => Triage => Triage = { player =>
+          _.updatedWith(player.score)(_.map(_.filterNot(_.player == player)))
+        }
+
+        val newTriage = (stopWaiting(newMatch.playerA) andThen stopWaiting(newMatch.playerB))(triage)
+
+        findMatches(rest, newTriage, matches :+ newMatch)
+      }
+
+      case _ => (triage, matches)
+    }
+  }
+
+  def findMatch(waiting: Waiting, triage: Triage): Option[Match] = {
+
+
+    val player = waiting.player
+
+    /*def blah: Option[Match] = if (waiting.elapsedMs() - waiting.startedMs <= config.maxWaitMs) {
+      None
+    } else {
+      val lowScore = max(0, waiting.player.score.value - config.maxScoreDelta).toInt
+      val highScore = (waiting.player.score.value + config.maxScoreDelta).toInt
+
+      val scoresBelow = (lowScore until waiting.player.score.value).map(Score.apply).flatMap(triage.get).flatten
+      val scoresAbove = (waiting.player.score.value + 1 to highScore).map(Score.apply).flatMap(triage.get).flatten
+
+      val otherScores: Seq[Waiting] = (scoresBelow ++ scoresAbove).sortWith((w1, w2) => delta(w1) < delta(w2))
+
+      otherScores.headOption.fold(none[Match])(w => createMatch(player, w.player).some)
+    }*/
+
+    // TODO - Sort out this crazy line
+    //triage.getOrElse(player.score, Nil).filterNot(_.player == player).filterNot(_.player.played.contains(player)).headOption.fold(blah)(w => createMatch(player, w.player).some)
+    findMatch(player, triage.getOrElse(player.score, Nil), blahX(waiting, triage))
+  }
+
+  def findMatch(player: Player, waiting: List[Waiting], f: Player => Option[Match]): Option[Match] =
+    waiting.filterNot(_.player == player).filterNot(_.player.played.contains(player)).headOption.fold(f(player))(w => createMatch(player, w.player).some)
+
+
+  def blahX(waiting: Waiting, triage: Triage)(player: Player): Option[Match] =
+    if (waiting.elapsedMs() - waiting.startedMs <= config.maxWaitMs)
+      None
+    else
+      blah(player, triage)
+
+
+  def blah(player: Player, triage: Triage): Option[Match] = {
+    val lowScore = max(0, player.score.value - config.maxScoreDelta).toInt
+    val highScore = (player.score.value + config.maxScoreDelta).toInt
+
+    val scoresBelow = (lowScore until player.score.value).map(Score.apply).flatMap(triage.get).flatten
+    val scoresAbove = (player.score.value + 1 to highScore).map(Score.apply).flatMap(triage.get).flatten
+
+    val otherScores: Seq[Waiting] = (scoresBelow ++ scoresAbove).sortWith((w1, w2) => delta(w1) < delta(w2))
+
+    otherScores.headOption.fold(none[Match])(w => createMatch(player, w.player).some)
+  }
+
+  def delta(waiting: Waiting): Int =
+    abs(config.maxScoreDelta - waiting.player.score.value).toInt
+
+  /**
+   * Create a Match for two players where the player with lowest ID will be given first in Match(player1, player2)
+   * @param player1 Player
+   * @param player2 Player
+   * @return Match
+   */
+  def createMatch(player1: Player, player2: Player): Match = {
+    if (player1.id <= player2.id)
+      Match(player1, player2)
+    else
+      Match(player2, player1)
+  }
+
 
   /*
 
@@ -117,31 +204,6 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
 
   def matchAllowed(player: Player, opponent: Player): Boolean =
     !player.played.contains(opponent) && player.score.difference(opponent.score) <= Score(config.maxScoreDelta.toInt)
-
-  /**
-   * Create a Match for two players where the player with lowest ID will be given first in Match(player1, player2)
-   * @param waiting Waiting
-   * @param matchedWaiting Waiting
-   * @return Match
-   */
-  def createMatch(waiting: Waiting, matchedWaiting: Waiting): Match = {
-    val newMatch = if (waiting.player.id <= matchedWaiting.player.id)
-      Match(waiting.player, matchedWaiting.player)
-    else
-      Match(matchedWaiting.player, waiting.player)
-
-    atomic { implicit txn =>
-      val stopWaiting: Waiting => Unit = { w =>
-        waitingPlayers.updateWith(w.player.score)(_.map(_.filterNot(_ == w)))
-      }
-
-      stopWaiting(waiting)
-      stopWaiting(matchedWaiting)
-    }
-
-    println(newMatch)
-    newMatch
-  }
 
   def unmatched(waiting: Waiting, matchingScore: Score): Option[Match] = {
     if (waiting.elapsedMs() - waiting.startedMs > config.maxWaitMs)
