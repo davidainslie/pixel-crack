@@ -18,8 +18,6 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
   val noSideEffect: Output => Unit =
     _ => ()
 
-  val controller = new Controller(config, noSideEffect)
-
   val `0 elapsed ms`: () => Int =
     () => 0
 
@@ -35,8 +33,58 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
   val `player 3 advanced`: Player =
     Player(ID(3, `0 elapsed ms`), Score(3))
 
+  val controller = new Controller(config, noSideEffect)
+
+  import controller._
+
   "Controller" should {
+    "create a match (always in the same order) for two given players" in {
+      val resultingMatch = Match(`player 1 beginner`, `player 2 beginner`)
+
+      createMatch(`player 1 beginner`, `player 2 beginner`) mustBe resultingMatch
+      createMatch(`player 2 beginner`, `player 1 beginner`) mustBe resultingMatch
+    }
+
     "receive players in waiting" in {
+      receive(Waiting(`player 1 beginner`))
+      receive(Waiting(`player 2 beginner`))
+
+      waitingQueueSnapshot mustBe List(Waiting(`player 1 beginner`), Waiting(`player 2 beginner`))
+    }
+
+    "triage empty queue of waiting players" in {
+      val (triage, _) = controller.dequeueWaiting.run(Map.empty).value
+      triage.isEmpty mustBe true
+    }
+
+    "triage waiting players that have been queued" in {
+      receive(Waiting(`player 1 beginner`))
+      receive(Waiting(`player 3 advanced`))
+
+      val (triage, _) = controller.dequeueWaiting.run(Map.empty).value
+
+      triage.size mustBe 2
+      triage(`player 1 beginner`.score) mustBe List(Waiting(`player 1 beginner`))
+      triage(`player 3 advanced`.score) mustBe List(Waiting(`player 3 advanced`))
+    }
+
+    // TODO - findMatches: State[Triage, List[Match]]
+
+    // TODO - findMatches(triage: Triage): (Triage, List[Match])
+
+    // TODO - findMatches(waitings: List[Waiting], triage: Triage, matches: List[Match] = Nil): (Triage, List[Match])
+
+    // TODO - findMatch(waiting: Waiting, triage: Triage): Option[Match]
+
+    // TODO - findMatch(player: Player, triage: Triage): Option[Match]
+
+    // TODO - scoreDelta(waiting: Waiting): Int
+  }
+
+  ///////////
+
+  "Controller OLD" should {
+    "receive players in waiting" ignore {
       controller receive Waiting(`player 1 beginner`)
       controller receive Waiting(`player 2 beginner`)
 
@@ -45,8 +93,6 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       /*println(s"Waiting snapshot:")
       println(controller.waitingSnapshot.mkString("\n"))
       println()*/
-
-
 
       /*scheduler.scheduleOnce(7 seconds) {
         println("Hello, world!")
@@ -75,7 +121,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       println()*/
     }
 
-    "not find matches when there are no waiting players" in {
+    "not find matches when there are no waiting players" ignore {
       controller.findMatches(Map.empty) mustBe (Map.empty, Nil)
     }
 
@@ -90,7 +136,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       controller.findMatches(triage) mustBe (triage, Nil)
     }
 
-    "not find match" in {
+    "not find match" ignore {
       val triage = Map(
         Score(0) -> List(
           Waiting(`player 1 beginner`),
@@ -102,14 +148,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
     }
   }
 
-  "Controller matching" should {
-    "create a match (always in the same order) for two given players" in {
-      val resultingMatch = Match(`player 1 beginner`, `player 2 beginner`)
 
-      controller.createMatch(`player 1 beginner`, `player 2 beginner`) mustBe resultingMatch
-      controller.createMatch(`player 2 beginner`, `player 1 beginner`) mustBe resultingMatch
-    }
-  }
 
   "Controller matching via scheduler" should {
     "receive players in waiting" ignore {
