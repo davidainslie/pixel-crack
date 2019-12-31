@@ -1,17 +1,12 @@
 package com.backwards.pixel
 
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import scala.collection.mutable
-import scala.concurrent.stm._
-import cats.Eval
+import scala.math._
 import cats.data.State
 import cats.implicits._
 import monix.eval.Task
-import monix.execution.atomic.AtomicInt
 import monix.execution.{CancelableFuture, Scheduler}
-import monocle.macros.syntax.lens._
-import scala.math._
 
 /** We presume this `Controller` is managed somehow such that it is instantiated,
  * receives input somehow, and can appropriately process the output. The config
@@ -53,7 +48,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
   def doMatch(): State[Triage, List[Match]] =
     for {
       _ <- State.get[Triage]
-      _ <- updateTriage
+      _ <- dequeueWaiting
       matches <- findMatches
       _ <- if (matching.isCompleted) State.get[Triage] else {
         TimeUnit.SECONDS.sleep(3) // TODO - Remove
@@ -61,7 +56,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
       }
     } yield matches
 
-  def updateTriage: State[Triage, Unit] =
+  def dequeueWaiting: State[Triage, Unit] =
     State.modify[Triage] { triage =>
       waitingQueue.dequeueAll(_ => true).foldLeft(triage) { (triage, w) =>
         triage.updatedWith(w.player.score) {
@@ -82,31 +77,32 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
     }
 
   def findMatches(triage: Triage): (Triage, List[Match]) = {
-    val waiting = triage.values.flatten.toList.sortWith(_.player.score > _.player.score)
-    findMatches(waiting, triage)
+    val waitings = triage.values.flatten.toList.sortWith(_.player.score > _.player.score)
+    findMatches(waitings, triage)
   }
 
-  def findMatches(waiting: List[Waiting], triage: Triage, matches: List[Match] = Nil): (Triage, List[Match]) = {
-    waiting match {
-      case w +: rest => findMatch(w, triage).fold(findMatches(rest, triage, matches)) { newMatch =>
-        val stopWaiting: Player => Triage => Triage = { player =>
-          _.updatedWith(player.score)(_.map(_.filterNot(_.player == player)))
+  def findMatches(waitings: List[Waiting], triage: Triage, matches: List[Match] = Nil): (Triage, List[Match]) =
+    waitings match {
+      case w +: rest =>
+        findMatch(w, triage).fold(findMatches(rest, triage, matches)) { newMatch =>
+          val stopWaiting: Player => Triage => Triage = { player =>
+            _.updatedWith(player.score)(_.map(_.filterNot(_.player == player)))
+          }
+
+          val newTriage = (stopWaiting(newMatch.playerA) andThen stopWaiting(newMatch.playerB))(triage)
+
+          findMatches(rest, newTriage, matches :+ newMatch)
         }
 
-        val newTriage = (stopWaiting(newMatch.playerA) andThen stopWaiting(newMatch.playerB))(triage)
-
-        findMatches(rest, newTriage, matches :+ newMatch)
-      }
-
-      case _ => (triage, matches)
+      case _ =>
+        (triage, matches)
     }
-  }
 
   def findMatch(waiting: Waiting, triage: Triage): Option[Match] = {
     val waitingPlayer = waiting.player
-    val sameScoreWaiting: List[Waiting] = triage.getOrElse(waitingPlayer.score, Nil)
+    val waitings: List[Waiting] = triage.getOrElse(waitingPlayer.score, Nil)
 
-    sameScoreWaiting.filterNot(_.player == waitingPlayer).filterNot(_.player.played.contains(waitingPlayer)).headOption match {
+    waitings.filterNot(_.player == waitingPlayer).filterNot(_.player.played.contains(waitingPlayer)).headOption match {
       case Some(w) =>
         createMatch(waitingPlayer, w.player).some
 
@@ -125,12 +121,12 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
     val scoresBelow = (lowScore until player.score.value).map(Score.apply).flatMap(triage.get).flatten
     val scoresAbove = (player.score.value + 1 to highScore).map(Score.apply).flatMap(triage.get).flatten
 
-    val otherScores: Seq[Waiting] = (scoresBelow ++ scoresAbove).sortWith((w1, w2) => delta(w1) < delta(w2))
+    val waitings: Seq[Waiting] = (scoresBelow ++ scoresAbove).sortWith((w1, w2) => scoreDelta(w1) < scoreDelta(w2))
 
-    otherScores.headOption.fold(none[Match])(w => createMatch(player, w.player).some)
+    waitings.headOption.fold(none[Match])(w => createMatch(player, w.player).some)
   }
 
-  def delta(waiting: Waiting): Int =
+  def scoreDelta(waiting: Waiting): Int =
     abs(config.maxScoreDelta - waiting.player.score.value).toInt
 
   /**
