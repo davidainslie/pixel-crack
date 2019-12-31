@@ -18,9 +18,9 @@ import monocle.macros.syntax.lens._
  * of this controller created per-runtime (but `receive` could be called by
  * multiple parallel threads for instance). */
 class Controller(config: Config, out: Output => Unit)(implicit scheduler: Scheduler) {
-  type Matchings = Map[Score, List[Waiting]]
+  type Triage = Map[Score, List[Waiting]]
 
-  private val waiting = new mutable.Queue[Waiting]
+  private val waiting = mutable.Queue.empty[Waiting]
 
   /*private val highestScore = Ref(Score(0))
 
@@ -42,31 +42,31 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
 
   val temp = new AtomicInteger(0)
 
-  def doMatch(): State[Matchings, String] =
+  def doMatch(): State[Triage, String] =
     for {
-      _ <- State.get[Matchings]
-      blah <- nextMatchings
-      zz <- if (temp.get > 3) State.get[Matchings] else {
+      _ <- State.get[Triage]
+      blah <- nextTriage
+      zz <- if (temp.get > 3) State.get[Triage] else {
         TimeUnit.SECONDS.sleep(3)
         doMatch()
       }
       //xx <- matchGames
     } yield blah
 
-  def nextMatchings: State[Matchings, String] =
-    State[Matchings, String] { matchings =>
-      val nextMatchings: Matchings = waiting.dequeueAll(_ => true).foldLeft(matchings) { (matchings, w) =>
-        matchings.updatedWith(w.player.score) {
+  def nextTriage: State[Triage, String] =
+    State[Triage, String] { triage =>
+      val nextTriage: Triage = waiting.dequeueAll(_ => true).foldLeft(triage) { (triage, w) =>
+        triage.updatedWith(w.player.score) {
           case None => Option(List(w))
           case waiting => waiting.map(_ :+ w)
         }
       }
 
-      println(s"\n ===> Next matchings: $nextMatchings \n")
+      println(s"\n ===> Next triage: $nextTriage \n")
       println(s"\n ===> Waiting: $waiting \n")
       temp.incrementAndGet()
 
-      (nextMatchings, "boo")
+      (nextTriage, "boo")
     }
 
   //def matchGames : State[Matchings, String] = ???

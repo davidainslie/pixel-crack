@@ -42,10 +42,10 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       println(controller.waitingSnapshot.mkString("\n"))
       println()
 
-      val (matchings, result) = controller.doMatch().run(Map.empty).value
+      val (triage, result) = controller.doMatch().run(Map.empty).value
 
-      println(s"Matchings:")
-      println(matchings.mkString("\n"))
+      println(s"Triage:")
+      println(triage.mkString("\n"))
       println()
 
       println(s"Waiting snapshot:")
