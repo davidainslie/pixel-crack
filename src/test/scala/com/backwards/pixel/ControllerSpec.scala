@@ -104,8 +104,9 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
 
     // waitingsWithinScoreDelta(player: Player, triage: Triage): Seq[Waiting]
 
-    "aquire all waiting players within a given player's score delta" in {
-
+    "aquire all waiting players for a given player" in {
+      waitingsOfSameScore(`player 1 beginner`, triage) mustBe List(Waiting(`player 2 beginner`))
+      //waitingsWithinScoreDelta()
     }
 
 

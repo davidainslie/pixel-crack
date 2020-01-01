@@ -100,12 +100,14 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
 
   def findMatch(waiting: Waiting, triage: Triage): Option[Match] = {
     val player = waiting.player
-    val waitings: List[Waiting] = triage.getOrElse(player.score, Nil)
+    val waitings: Seq[Waiting] = waitingsOfSameScore(player, triage)
 
     findMatch(player, waitings) orElse {
       Option.when(overdue(waiting))(findMatch(player, waitingsWithinScoreDelta(player, triage))).flatten
     }
   }
+
+
 
   def findMatch(player: Player, waitings: Seq[Waiting]): Option[Match] = {
     val isPlayer: Waiting => Boolean = _.player == player
@@ -115,6 +117,22 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
     waitings.filterNot(isPlayer).filterNot(hasPlayed).headOption.map(_.player).map(createMatch(player, _))
   }
 
+  /**
+   * All waiting players with same score as given player
+   * @param player Player
+   * @param triage Triage
+   * @return Seq[Waiting]
+   */
+  def waitingsOfSameScore(player: Player, triage: Triage): Seq[Waiting] =
+    triage.getOrElse(player.score, Nil).filterNot(_.player == player)
+
+  /**
+   * All waiting players within the score delta (maximum configured) of given player,
+   * EXCLUDING players of equal score @see waitingsOfSameScore
+   * @param player Player
+   * @param triage Triage
+   * @return Seq[Waiting]
+   */
   def waitingsWithinScoreDelta(player: Player, triage: Triage): Seq[Waiting] = {
     val lowScore = max(0, player.score.value - config.maxScoreDelta).toInt
     val highScore = (player.score.value + config.maxScoreDelta).toInt
