@@ -107,6 +107,29 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       waitingsWithinScoreDelta(`player 1 beginner`, triage) mustBe List(Waiting(`player 3 advanced`), Waiting(`player 4 topdog`))
     }
 
+    "find match of same score for a waiting player" in {
+      findMatch(Waiting(`player 1 beginner`), triage) mustBe Match(`player 1 beginner`, `player 2 beginner`).some
+    }
+
+    "not find match of same score for a waiting player" in {
+      findMatch(Waiting(`player 4 topdog`), triage) mustBe None
+    }
+
+    "find match of different score within score delta for an overdue waiting player" in {
+      val waiting = Waiting(`player 4 topdog`).lens(_.elapsedMs).set(`> maxWaitMs elapsed`)
+
+      findMatch(waiting, triage) mustBe Match(`player 3 advanced`, `player 4 topdog`).some
+    }
+
+    "not find match of different score for an overdue waiting player when score delta is too big" in {
+      val waiting = Waiting(`player 5 invisible`).lens(_.elapsedMs).set(`> maxWaitMs elapsed`)
+
+      findMatch(waiting, triage) mustBe None
+    }
+
+    // TODO new should higher level:
+    // TODO find matches and assert that triage has matched players removed.
+
 
 
     // TODO - findMatches: State[Triage, List[Match]]
@@ -114,10 +137,6 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
     // TODO - findMatches(triage: Triage): (Triage, List[Match])
 
     // TODO - findMatches(waitings: List[Waiting], triage: Triage, matches: List[Match] = Nil): (Triage, List[Match])
-
-    // TODO - findMatch(waiting: Waiting, triage: Triage): Option[Match]
-
-    // TODO - findMatch(player: Player, triage: Triage): Option[Match]
   }
 
   ///////////

@@ -16,7 +16,7 @@ import monix.execution.{CancelableFuture, Scheduler}
 class Controller(config: Config, out: Output => Unit)(implicit scheduler: Scheduler) {
   type Triage = Map[Score, List[Waiting]]
 
-  private val waitingQueue = mutable.Queue.empty[Waiting]
+  private val waitingQueue = mutable.Queue.empty[Waiting] // TODO - Thread safe? Need concurrent test
 
   /*private val highestScore = Ref(Score(0))
 
@@ -66,6 +66,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
       }
     }
 
+  // TODO - Remove
   def findMatches: State[Triage, List[Match]] =
     State[Triage, List[Match]] { triage =>
       val (nextTriage, matches) = findMatches(triage)
@@ -77,26 +78,25 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
     }
 
   def findMatches(triage: Triage): (Triage, List[Match]) = {
-    val waitings = triage.values.flatten.toList.sortWith(_.player.score > _.player.score)
-    findMatches(waitings, triage)
-  }
-
-  def findMatches(waitings: List[Waiting], triage: Triage, matches: List[Match] = Nil): (Triage, List[Match]) =
-    waitings match {
+    def findMatches(triage: Triage, matches: List[Match]): List[Waiting] => (Triage, List[Match]) = {
       case w +: rest =>
-        findMatch(w, triage).fold(findMatches(rest, triage, matches)) { newMatch =>
+        findMatch(w, triage).fold(findMatches(triage, matches)(rest)) { newMatch =>
           val stopWaiting: Player => Triage => Triage = { player =>
             _.updatedWith(player.score)(_.map(_.filterNot(_.player == player)))
           }
 
           val newTriage = (stopWaiting(newMatch.playerA) andThen stopWaiting(newMatch.playerB))(triage)
 
-          findMatches(rest, newTriage, matches :+ newMatch)
+          findMatches(newTriage, matches :+ newMatch)(rest)
         }
 
       case _ =>
         (triage, matches)
     }
+
+    val waitings = triage.values.flatten.toList.sortWith(_.player.score > _.player.score)
+    findMatches(triage, Nil)(waitings)
+  }
 
   def findMatch(waiting: Waiting, triage: Triage): Option[Match] = {
     val player = waiting.player
