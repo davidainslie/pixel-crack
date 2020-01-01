@@ -33,18 +33,33 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
   val `player 3 advanced`: Player =
     Player(ID(3, `0 elapsed ms`), Score(3))
 
+  val `player 4 topdog`: Player =
+    Player(ID(4, `0 elapsed ms`), Score(5))
+
+  val `player 5 invisible`: Player =
+    Player(ID(5, `0 elapsed ms`), Score(99))
+
+  val triage = Map(
+    Score(0) -> List(
+      Waiting(`player 1 beginner`),
+      Waiting(`player 2 beginner`)
+    ),
+    Score(3) -> List(
+      Waiting(`player 3 advanced`)
+    ),
+    Score(5) -> List(
+      Waiting(`player 4 topdog`)
+    ),
+    Score(99) -> List(
+      Waiting(`player 5 invisible`)
+    )
+  )
+
   val controller = new Controller(config, noSideEffect)
 
   import controller._
 
   "Controller" should {
-    "create a match (always in the same order) for two given players" in {
-      val resultingMatch = Match(`player 1 beginner`, `player 2 beginner`)
-
-      createMatch(`player 1 beginner`, `player 2 beginner`) mustBe resultingMatch
-      createMatch(`player 2 beginner`, `player 1 beginner`) mustBe resultingMatch
-    }
-
     "receive players in waiting" in {
       receive(Waiting(`player 1 beginner`))
       receive(Waiting(`player 2 beginner`))
@@ -68,6 +83,33 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       triage(`player 3 advanced`.score) mustBe List(Waiting(`player 3 advanced`))
     }
 
+    "create a match (always in the same order) for two given players" in {
+      val resultingMatch = Match(`player 1 beginner`, `player 2 beginner`)
+
+      createMatch(`player 1 beginner`, `player 2 beginner`) mustBe resultingMatch
+      createMatch(`player 2 beginner`, `player 1 beginner`) mustBe resultingMatch
+    }
+
+    "calculate a player's score delta to the maximum configured" in {
+      scoreDelta(`player 1 beginner`) mustBe config.maxScoreDelta - `player 1 beginner`.score.value
+      scoreDelta(`player 3 advanced`) mustBe config.maxScoreDelta - `player 3 advanced`.score.value
+    }
+
+    "indicate if waiting player is overdue" in {
+      val waiting = Waiting(`player 1 beginner`)
+
+      overdue(waiting) mustBe false
+      overdue(waiting.lens(_.elapsedMs).set(`> maxWaitMs elapsed`)) mustBe true
+    }
+
+    // waitingsWithinScoreDelta(player: Player, triage: Triage): Seq[Waiting]
+
+    "aquire all waiting players within a given player's score delta" in {
+
+    }
+
+
+
     // TODO - findMatches: State[Triage, List[Match]]
 
     // TODO - findMatches(triage: Triage): (Triage, List[Match])
@@ -77,8 +119,6 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
     // TODO - findMatch(waiting: Waiting, triage: Triage): Option[Match]
 
     // TODO - findMatch(player: Player, triage: Triage): Option[Match]
-
-    // TODO - scoreDelta(waiting: Waiting): Int
   }
 
   ///////////

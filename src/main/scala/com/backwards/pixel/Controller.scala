@@ -99,35 +99,39 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
     }
 
   def findMatch(waiting: Waiting, triage: Triage): Option[Match] = {
-    val waitingPlayer = waiting.player
-    val waitings: List[Waiting] = triage.getOrElse(waitingPlayer.score, Nil)
+    val player = waiting.player
+    val waitings: List[Waiting] = triage.getOrElse(player.score, Nil)
 
-    waitings.filterNot(_.player == waitingPlayer).filterNot(_.player.played.contains(waitingPlayer)).headOption match {
-      case Some(w) =>
-        createMatch(waitingPlayer, w.player).some
-
-      case None =>
-        if (waiting.elapsedMs() - waiting.startedMs <= config.maxWaitMs)
-          None
-        else
-          findMatch(waitingPlayer, triage)
+    findMatch(player, waitings) orElse {
+      Option.when(overdue(waiting))(findMatch(player, waitingsWithinScoreDelta(player, triage))).flatten
     }
   }
 
-  def findMatch(player: Player, triage: Triage): Option[Match] = {
+  def findMatch(player: Player, waitings: Seq[Waiting]): Option[Match] = {
+    val isPlayer: Waiting => Boolean = _.player == player
+
+    val hasPlayed: Waiting => Boolean = _.player.played.contains(player)
+
+    waitings.filterNot(isPlayer).filterNot(hasPlayed).headOption.map(_.player).map(createMatch(player, _))
+  }
+
+  def waitingsWithinScoreDelta(player: Player, triage: Triage): Seq[Waiting] = {
     val lowScore = max(0, player.score.value - config.maxScoreDelta).toInt
     val highScore = (player.score.value + config.maxScoreDelta).toInt
 
     val scoresBelow = (lowScore until player.score.value).map(Score.apply).flatMap(triage.get).flatten
     val scoresAbove = (player.score.value + 1 to highScore).map(Score.apply).flatMap(triage.get).flatten
 
-    val waitings: Seq[Waiting] = (scoresBelow ++ scoresAbove).sortWith((w1, w2) => scoreDelta(w1) < scoreDelta(w2))
-
-    waitings.headOption.fold(none[Match])(w => createMatch(player, w.player).some)
+    (scoresBelow ++ scoresAbove).sortWith { (w1, w2) =>
+      scoreDelta(w1.player) < scoreDelta(w2.player)
+    }
   }
 
-  def scoreDelta(waiting: Waiting): Int =
-    abs(config.maxScoreDelta - waiting.player.score.value).toInt
+  def scoreDelta(player: Player): Int =
+    abs(config.maxScoreDelta - player.score.value).toInt
+
+  def overdue(waiting: Waiting): Boolean =
+    waiting.elapsedMs() - waiting.startedMs > config.maxWaitMs
 
   /**
    * Create a Match for two players where the player with lowest ID will be given first in Match(player1, player2)
