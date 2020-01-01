@@ -26,32 +26,32 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
     () => config.maxWaitMs + 1
 
   val `player 1 beginner`: Player =
-    Player(ID(1, `0 elapsed ms`), Score(0))
+    Player(ID(1, `0 elapsed ms`), score = 0)
 
   val `player 2 beginner`: Player =
-    Player(ID(2, `0 elapsed ms`), Score(0))
+    Player(ID(2, `0 elapsed ms`), score = 0)
 
   val `player 3 advanced`: Player =
-    Player(ID(3, `0 elapsed ms`), Score(3))
+    Player(ID(3, `0 elapsed ms`), score = 3)
 
   val `player 4 topdog`: Player =
-    Player(ID(4, `0 elapsed ms`), Score(5))
+    Player(ID(4, `0 elapsed ms`), score = 5)
 
   val `player 5 invisible`: Player =
-    Player(ID(5, `0 elapsed ms`), Score(99))
+    Player(ID(5, `0 elapsed ms`), score = 99)
 
   val triage = Map(
-    Score(0) -> List(
+    0 -> List(
       Waiting(`player 1 beginner`),
       Waiting(`player 2 beginner`)
     ),
-    Score(3) -> List(
+    3 -> List(
       Waiting(`player 3 advanced`)
     ),
-    Score(5) -> List(
+    5 -> List(
       Waiting(`player 4 topdog`)
     ),
-    Score(99) -> List(
+    99 -> List(
       Waiting(`player 5 invisible`)
     )
   )
@@ -170,7 +170,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       val player: Int => List[Player] = { score =>
         (1 to numberOfPlayersPerScore).map { _ =>
           blah = blah + 1
-          Player(ID(blah, `0 elapsed ms`), Score(score))
+          Player(ID(blah, `0 elapsed ms`), score)
         } toList
       }
 

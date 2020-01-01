@@ -77,7 +77,7 @@ class Driver(
     // track of it separately; and, we use the sequence number `i` as a means of
     // discriminating players who would otherwise expire at the same instant.
     val t: Int = elapsedMs() + gamesPerPlayer * meanGameMs
-    val player = Player(ID(i.toLong << 32 | t & 0xFFFFFFFFL, elapsedMs), Score(0))
+    val player = Player(ID(i.toLong << 32 | t & 0xFFFFFFFFL, elapsedMs), score = 0)
 
     Waiting(player)
   }

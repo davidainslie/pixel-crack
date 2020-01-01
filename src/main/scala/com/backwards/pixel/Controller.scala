@@ -16,6 +16,7 @@ import scala.concurrent.stm._
  * of this controller created per-runtime (but `receive` could be called by
  * multiple parallel threads for instance). */
 class Controller(config: Config, out: Output => Unit)(implicit scheduler: Scheduler) {
+  type Score = Int // TODO - Originally had a Score ADT but reverted to simply Int, can't decide if this was wise.
   type Triage = Map[Score, List[Waiting]]
 
   private val waitingQueue = Ref(mutable.Queue.empty[Waiting])
@@ -90,8 +91,9 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
           }
 
           val newTriage = (stopWaiting(newMatch.playerA) andThen stopWaiting(newMatch.playerB))(triage)
+          val newRest = rest.filterNot(_.player == newMatch.playerA).filterNot(_.player == newMatch.playerB)
 
-          findMatches(newTriage, matches :+ newMatch)(rest)
+          findMatches(newTriage, matches :+ newMatch)(newRest)
         }
 
       case _ =>
@@ -130,11 +132,11 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
    * @return Seq[Waiting]
    */
   def waitingsWithinScoreDelta(player: Player, triage: Triage): Seq[Waiting] = {
-    val lowScore = max(0, player.score.value - config.maxScoreDelta).toInt
-    val highScore = (player.score.value + config.maxScoreDelta).toInt
+    val lowScore = max(0, player.score - config.maxScoreDelta).toInt
+    val highScore = (player.score + config.maxScoreDelta).toInt
 
-    val scoresBelow = (lowScore until player.score.value).map(Score.apply).flatMap(triage.get).flatten
-    val scoresAbove = (player.score.value + 1 to highScore).map(Score.apply).flatMap(triage.get).flatten
+    val scoresBelow = (lowScore until player.score).flatMap(triage.get).flatten
+    val scoresAbove = (player.score + 1 to highScore).flatMap(triage.get).flatten
 
     val waitings = (scoresBelow ++ scoresAbove).sortWith { (w1, w2) =>
       scoreDelta(player, w1.player) < scoreDelta(player, w2.player)
@@ -152,7 +154,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
   }
 
   def scoreDelta(p1: Player, p2: Player): Int =
-    abs(p1.score.value - p2.score.value)
+    abs(p1.score - p2.score)
 
   def overdue(waiting: Waiting): Boolean =
     waiting.elapsedMs() - waiting.startedMs > config.maxWaitMs
