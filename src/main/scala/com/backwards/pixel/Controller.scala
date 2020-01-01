@@ -134,7 +134,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
     val scoresAbove = (player.score.value + 1 to highScore).map(Score.apply).flatMap(triage.get).flatten
 
     val waitings = (scoresBelow ++ scoresAbove).sortWith { (w1, w2) =>
-      scoreDelta(w1.player) < scoreDelta(w2.player)
+      scoreDelta(player, w1.player) < scoreDelta(player, w2.player)
     }
 
     filter(waitings)(player)
@@ -148,8 +148,8 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
     waitings.filterNot(isPlayer).filterNot(hasPlayed)
   }
 
-  def scoreDelta(player: Player): Int =
-    abs(config.maxScoreDelta - player.score.value).toInt
+  def scoreDelta(p1: Player, p2: Player): Int =
+    abs(p1.score.value - p2.score.value)
 
   def overdue(waiting: Waiting): Boolean =
     waiting.elapsedMs() - waiting.startedMs > config.maxWaitMs

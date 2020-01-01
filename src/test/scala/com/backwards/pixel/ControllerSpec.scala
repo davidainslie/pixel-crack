@@ -90,9 +90,9 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       createMatch(`player 2 beginner`, `player 1 beginner`) mustBe resultingMatch
     }
 
-    "calculate a player's score delta to the maximum configured" in {
-      scoreDelta(`player 1 beginner`) mustBe config.maxScoreDelta - `player 1 beginner`.score.value
-      scoreDelta(`player 3 advanced`) mustBe config.maxScoreDelta - `player 3 advanced`.score.value
+    "calculate score delta of two players" in {
+      scoreDelta(`player 1 beginner`, `player 2 beginner`) mustBe 0
+      scoreDelta(`player 1 beginner`, `player 3 advanced`) mustBe 3
     }
 
     "indicate if waiting player is overdue" in {
@@ -102,11 +102,9 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       overdue(waiting.lens(_.elapsedMs).set(`> maxWaitMs elapsed`)) mustBe true
     }
 
-    // waitingsWithinScoreDelta(player: Player, triage: Triage): Seq[Waiting]
-
     "aquire all waiting players for a given player" in {
       waitingsOfSameScore(`player 1 beginner`, triage) mustBe List(Waiting(`player 2 beginner`))
-      //waitingsWithinScoreDelta()
+      waitingsWithinScoreDelta(`player 1 beginner`, triage) mustBe List(Waiting(`player 3 advanced`), Waiting(`player 4 topdog`))
     }
 
 
