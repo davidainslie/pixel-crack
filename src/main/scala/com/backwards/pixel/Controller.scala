@@ -16,6 +16,7 @@ import monix.execution.{CancelableFuture, Scheduler}
 class Controller(config: Config, out: Output => Unit)(implicit scheduler: Scheduler) {
   type Triage = Map[Score, List[Waiting]]
 
+  // TODO - Could use STM Ref
   private val waitingQueue = mutable.Queue.empty[Waiting] // TODO - Thread safe? Need concurrent test
 
   /*private val highestScore = Ref(Score(0))

@@ -127,17 +127,27 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       findMatch(waiting, triage) mustBe None
     }
 
-    // TODO new should higher level:
-    // TODO find matches and assert that triage has matched players removed.
-
-
-
     // TODO - findMatches: State[Triage, List[Match]]
-
-    // TODO - findMatches(triage: Triage): (Triage, List[Match])
-
-    // TODO - findMatches(waitings: List[Waiting], triage: Triage, matches: List[Match] = Nil): (Triage, List[Match])
   }
+
+  "Controller managing triage of waiting players" should {
+    "find all same score matches, which will also be evident in an updated triage" in {
+      val (newTriage, matches) = findMatches(triage)
+
+      newTriage mustBe triage.updatedWith(Score(0))(_ => Nil.some)
+      matches mustBe List(Match(`player 1 beginner`, `player 2 beginner`))
+    }
+
+    /*"find all matches both overdue and not, which will also be evident in an updated triage" in {
+      val (newTriage, matches) = findMatches(triage)
+
+      println("=" * 30)
+      println(newTriage)
+      println(matches)
+      println("=" * 30)
+    }*/
+  }
+
 
   ///////////
 

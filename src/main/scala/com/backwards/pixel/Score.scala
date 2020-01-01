@@ -1,7 +1,7 @@
 package com.backwards.pixel
 
 import cats.implicits._
-import cats.{Monoid, Order}
+import cats.{Monoid, Order, Show}
 import scala.math.abs
 
 // TODO - Smart constructor or Refined to avoid possible negative
@@ -25,4 +25,7 @@ object Score {
 
   implicit val scoreOrder: Order[Score] =
     (x: Score, y: Score) => x.value.compare(y.value)
+
+  implicit val scoreShow: Show[Score] =
+    Show.show[Score](_.value.toString)
 }
