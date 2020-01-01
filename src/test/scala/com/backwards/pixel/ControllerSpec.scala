@@ -162,8 +162,8 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       shutdown()
 
 
-      val numberOfScores = 4
-      val numberOfPlayersPerScore = 4
+      val numberOfScores = 10
+      val numberOfPlayersPerScore = 10
 
       var blah = 0
 
