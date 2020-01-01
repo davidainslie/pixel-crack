@@ -99,14 +99,13 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
     }
 
   def findMatch(waiting: Waiting, triage: Triage): Option[Match] = {
-    def findMatch(player: Player, waitings: Seq[Waiting]): Option[Match] =
+    val player = waiting.player
+
+    def findMatch(waitings: Seq[Waiting]): Option[Match] =
       waitings.headOption.map(_.player).map(createMatch(player, _))
 
-    val player = waiting.player
-    val waitings: Seq[Waiting] = waitingsOfSameScore(player, triage)
-
-    findMatch(player, waitings) orElse {
-      Option.when(overdue(waiting))(findMatch(player, waitingsWithinScoreDelta(player, triage))).flatten
+    findMatch(waitingsOfSameScore(player, triage)) orElse {
+      Option.when(overdue(waiting))(findMatch(waitingsWithinScoreDelta(player, triage))).flatten
     }
   }
 
