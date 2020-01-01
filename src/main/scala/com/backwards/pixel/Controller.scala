@@ -50,7 +50,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
     for {
       _ <- State.get[Triage]
       _ <- dequeueWaiting
-      matches <- findMatches
+      matches <- State(findMatches)
       _ <- if (matching.isCompleted) State.get[Triage] else {
         TimeUnit.SECONDS.sleep(3) // TODO - Remove
         doMatch()
@@ -65,17 +65,6 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
           case waiting => waiting.map(_ :+ w)
         }
       }
-    }
-
-  // TODO - Remove
-  def findMatches: State[Triage, List[Match]] =
-    State[Triage, List[Match]] { triage =>
-      val (nextTriage, matches) = findMatches(triage)
-
-      println(s"\n ===> Next triage: $nextTriage \n")
-      println(s"\n ===> Waiting: $waitingQueue \n")
-
-      (nextTriage, matches)
     }
 
   /**

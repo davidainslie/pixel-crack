@@ -197,32 +197,6 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       println(matches)
       println()*/
     }
-
-    "not find matches when there are no waiting players" ignore {
-      controller.findMatches(Map.empty) mustBe (Map.empty, Nil)
-    }
-
-    "not find matches" in {
-      val triage = Map(
-        Score(0) -> List(
-          Waiting(`player 1 beginner`),
-          Waiting(`player 2 beginner`)
-        )
-      )
-
-      controller.findMatches(triage) mustBe (triage, Nil)
-    }
-
-    "not find match" ignore {
-      val triage = Map(
-        Score(0) -> List(
-          Waiting(`player 1 beginner`),
-          Waiting(`player 2 beginner`)
-        )
-      )
-
-      println("=====> " + controller.findMatch(Waiting(`player 1 beginner`), triage))
-    }
   }
 
 
@@ -250,73 +224,6 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
   }
 
   /*
-
-
-  "Controller" should {
-    "receive players in waiting" in {
-
-
-      controller.waitingPlayersSnapshot.size mustBe 1
-      controller.waitingPlayersSnapshot(`player 1 beginner`.score).size mustBe 2
-    }
-
-    "match player in waiting to another of equal score (and vice versa)" in {
-      def findMatch(playerA: Player, playerB: Player): Option[Match] = {
-        controller receive Waiting(playerA)
-        controller receive Waiting(playerB)
-
-        val foundMatch = controller.findMatch(Waiting(playerA), playerA.score)
-
-        // 2nd call to finding a match will not "match" as the match has already been created
-        controller.findMatch(Waiting(playerA), playerA.score) mustBe None
-
-        foundMatch
-      }
-
-      findMatch(`player 1 beginner`, `player 2 beginner`) mustBe Option(Match(`player 1 beginner`, `player 2 beginner`))
-      findMatch(`player 2 beginner`, `player 1 beginner`) mustBe Option(Match(`player 1 beginner`, `player 2 beginner`))
-    }
-
-    "match player in waiting to another of lesser score" in {
-      controller receive Waiting(`player 1 beginner`)
-      controller receive Waiting(`player 3 advanced`)
-
-      controller.findMatch(Waiting(`player 3 advanced`), `player 1 beginner`.score) mustBe Option(Match(`player 1 beginner`, `player 3 advanced`))
-    }
-
-    "not match player in waiting as there are no other players" in {
-      controller receive Waiting(`player 1 beginner`)
-
-      controller.findMatch(Waiting(`player 1 beginner`), `player 1 beginner`.score) mustBe None
-    }
-
-    "not match non overdue player in waiting to another player of different score" in {
-      controller receive Waiting(`player 1 beginner`)
-      controller receive Waiting(`player 3 advanced`)
-
-      controller.findMatch(Waiting(`player 3 advanced`), `player 3 advanced`.score) mustBe None
-    }
-
-    "match overdue player in waiting to another player of lesser score" in {
-      val `player 3 advanced waiting` = Waiting(`player 3 advanced`, 0, `> maxWaitMs elapsed`)
-
-      controller receive Waiting(`player 1 beginner`)
-      controller receive `player 3 advanced waiting`
-
-      controller.findMatch(`player 3 advanced waiting`, `player 3 advanced`.score) mustBe Option(Match(`player 1 beginner`, `player 3 advanced`))
-    }
-
-    "not match overdue player in waiting to another of lesser score as the score delta exceeds configured 'maximum score delta'" in {
-      val controller = new Controller(config.lens(_.maxScoreDelta).set(1), noSideEffect)
-
-      val `player 3 advanced waiting` = Waiting(`player 3 advanced`, 0, `> maxWaitMs elapsed`)
-
-      controller receive Waiting(`player 1 beginner`)
-      controller receive `player 3 advanced waiting`
-
-      controller.findMatch(`player 3 advanced waiting`, `player 3 advanced`.score) mustBe None
-    }
-  }
 
   "Controller matching" should {
     "run in background on a scheduler" in {
