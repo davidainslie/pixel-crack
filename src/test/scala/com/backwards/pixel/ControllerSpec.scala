@@ -1,14 +1,12 @@
 package com.backwards.pixel
 
-import java.util.concurrent.TimeUnit
+import cats.data.State
 import cats.implicits._
 import monix.execution.schedulers.TestScheduler
 import monocle.macros.syntax.lens._
 import org.scalatest.OneInstancePerTest
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import scala.concurrent.duration._
-import scala.util.{Failure, Success}
 
 class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
   implicit val scheduler: TestScheduler = TestScheduler()
@@ -60,7 +58,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
 
   import controller._
 
-  /*"Controller" should {
+  "Controller" should {
     "receive players in waiting" in {
       receive(Waiting(`player 1 beginner`))
       receive(Waiting(`player 2 beginner`))
@@ -136,7 +134,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
     "find all same score matches, which will also be evident in an updated triage" in {
       val (newTriage, matches) = findMatches(triage)
 
-      newTriage mustBe vacate(Score(0))(triage)
+      newTriage mustBe vacate(0)(triage)
       matches mustBe List(Match(`player 1 beginner`, `player 2 beginner`))
     }
 
@@ -147,162 +145,39 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
 
       val (newTriage, matches) = findMatches(triageIncludingOverdue)
 
-      newTriage mustBe (vacate(Score(0)) andThen vacate(Score(3)) andThen vacate(Score(5)))(triage)
+      newTriage mustBe (vacate(0) andThen vacate(3) andThen vacate(5))(triage)
 
       matches mustBe List(
         Match(`player 3 advanced`, `player 4 topdog`),
         Match(`player 1 beginner`, `player 2 beginner`)
       )
     }
-  }*/
+  }
 
   "Controller matching (daemon) task" should {
-    "" in {
-
+    "match a bunch of players" in {
+      // This "shutdown" looks odd, but it just prevents the daemon matching from endlessly recursing
       shutdown()
-
 
       val numberOfScores = 10
       val numberOfPlayersPerScore = 10
 
-      var blah = 0
+      def createPlayers(score: Int): State[List[Player], Unit] =
+        for {
+          _ <- State.modify[List[Player]] {
+            _ ++ (score until score + numberOfPlayersPerScore).map(id => Player(ID(id, `0 elapsed ms`), score))
+          }
+          _ <- if (score >= numberOfScores) State.get[List[Player]] else createPlayers(score + 1)
+        } yield ()
 
-      val player: Int => List[Player] = { score =>
-        (1 to numberOfPlayersPerScore).map { _ =>
-          blah = blah + 1
-          Player(ID(blah, `0 elapsed ms`), score)
-        } toList
-      }
+      val (players, _) = createPlayers(1).run(List.empty[Player]).value
 
-      val players = (1 to numberOfScores).flatMap(player).toList
       players.map(Waiting.apply).foreach(receive)
 
-      /*controller.waitingPlayersSnapshot.size mustBe numberOfScores
-
-      (1 to numberOfScores).foreach { score =>
-        controller.waitingPlayersSnapshot(Score(score)).size mustBe numberOfPlayersPerScore
-      }*/
-
-      println(numberOfScores * numberOfPlayersPerScore / 2)
-
-
-
-
-      println("hi start")
       val (triage, matches) = doMatch().run(Map.empty).value
-      println("hi end")
 
-      println(matches.map(_.show).mkString("\n"))
-
+      triage.values.flatten mustBe Nil
       matches.size mustBe (numberOfScores * numberOfPlayersPerScore / 2)
     }
   }
-
-
-  ///////////
-
-  "Controller OLD" should {
-    "receive players in waiting" ignore {
-      controller receive Waiting(`player 1 beginner`)
-      controller receive Waiting(`player 2 beginner`)
-
-      controller.waitingQueueSnapshot mustBe List(Waiting(`player 1 beginner`), Waiting(`player 2 beginner`))
-
-      /*println(s"Waiting snapshot:")
-      println(controller.waitingSnapshot.mkString("\n"))
-      println()*/
-
-      /*scheduler.scheduleOnce(7 seconds) {
-        println("Hello, world!")
-        controller.matching.cancel()
-      }*/
-
-      /*scheduler.tickOne()
-
-      println("................ hi")
-
-      TimeUnit.SECONDS.sleep(10)*/
-
-      /*val (triage, matches) = controller.doMatch().run(Map.empty).value
-
-
-      println(s"Triage:")
-      println(triage.mkString("\n"))
-      println()
-
-      println(s"Waiting snapshot:")
-      println(controller.waitingSnapshot.mkString("\n"))
-      println()
-
-      println(s"Final result:")
-      println(matches)
-      println()*/
-    }
-  }
-
-
-
-  "Controller matching via scheduler" should {
-    "receive players in waiting" ignore {
-      implicit val scheduler = monix.execution.Scheduler.global
-
-      controller receive Waiting(`player 1 beginner`)
-      controller receive Waiting(`player 2 beginner`)
-
-      println(s"Waiting snapshot:")
-      println(controller.waitingQueueSnapshot.mkString("\n"))
-      println()
-
-
-      /*scheduler.scheduleOnce(7 seconds) {
-        println("Hello, world!")
-        controller.matching.cancel()
-      }
-
-      println("Test waiting.......")
-      TimeUnit.SECONDS.sleep(10)*/
-    }
-  }
-
-  /*
-
-  "Controller matching" should {
-    "run in background on a scheduler" in {
-      implicit val scheduler: TestScheduler = TestScheduler()
-
-      val controller = new Controller(config, noSideEffect) {
-        override def doMatch(): List[Match] = throw new Exception("Ran and prematurely ended")
-      }
-
-      controller.matching.isCompleted mustBe false
-      scheduler.tickOne()
-      controller.matching.isCompleted mustBe true
-    }
-
-    "match all waiting players of equal score" in {
-      val numberOfScores = 10
-      val numberOfPlayersPerScore = 10
-
-      var blah = 0
-
-      val player: Int => List[Player] = { score =>
-        (1 to numberOfPlayersPerScore).map { _ =>
-          blah = blah + 1
-          Player(ID(blah, `0 elapsed ms`), Score(score))
-        } toList
-      }
-
-      val players = (1 to numberOfScores).flatMap(player).toList
-      players.map(Waiting.apply).foreach(controller.receive)
-
-      controller.waitingPlayersSnapshot.size mustBe numberOfScores
-
-      (1 to numberOfScores).foreach { score =>
-        controller.waitingPlayersSnapshot(Score(score)).size mustBe numberOfPlayersPerScore
-      }
-
-      println(numberOfScores * numberOfPlayersPerScore / 2)
-      controller.doMatch().size mustBe (numberOfScores * numberOfPlayersPerScore / 2)
-    }
-  }*/
 }

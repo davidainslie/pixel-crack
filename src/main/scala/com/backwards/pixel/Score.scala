@@ -5,7 +5,8 @@ import cats.implicits._
 import cats.{Monoid, Order, Show}
 import scala.math.abs
 
-// TODO - Smart constructor or Refined to avoid possible negative
+// TODO - Smart constructor or Refined to avoid possible negative.
+// TODO - However, the use of this ADT has been removed (maybe good idea or maybe not)
 case class Score(value: Int) extends AnyVal {
   def decrement: Option[Score] = {
     val nextValue = value - 1

@@ -52,7 +52,6 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
 
   def doMatch(): State[Triage, List[Match]] =
     for {
-      _ <- State.get[Triage]
       _ <- dequeueWaiting
       matches <- State(findMatches)
       _ <- if (isShutdown.isCompleted) State.get[Triage] else {
