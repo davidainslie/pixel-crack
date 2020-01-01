@@ -8,6 +8,7 @@ import org.scalatest.OneInstancePerTest
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
   implicit val scheduler: TestScheduler = TestScheduler()
@@ -157,16 +158,43 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
 
   "Controller matching (daemon) task" should {
     "" in {
-      println(matching)
 
-      monix.execution.Scheduler.global.scheduleOnce(5 seconds) {
-        println("Let's cancel")
-        matching.cancel()
+      shutdown()
+
+
+      val numberOfScores = 4
+      val numberOfPlayersPerScore = 4
+
+      var blah = 0
+
+      val player: Int => List[Player] = { score =>
+        (1 to numberOfPlayersPerScore).map { _ =>
+          blah = blah + 1
+          Player(ID(blah, `0 elapsed ms`), Score(score))
+        } toList
       }
 
+      val players = (1 to numberOfScores).flatMap(player).toList
+      players.map(Waiting.apply).foreach(receive)
+
+      /*controller.waitingPlayersSnapshot.size mustBe numberOfScores
+
+      (1 to numberOfScores).foreach { score =>
+        controller.waitingPlayersSnapshot(Score(score)).size mustBe numberOfPlayersPerScore
+      }*/
+
+      println(numberOfScores * numberOfPlayersPerScore / 2)
+
+
+
+
       println("hi start")
-      doMatch().run(Map.empty).value
+      val (triage, matches) = doMatch().run(Map.empty).value
       println("hi end")
+
+      println(matches.map(_.show).mkString("\n"))
+
+      matches.size mustBe (numberOfScores * numberOfPlayersPerScore / 2)
     }
   }
 
@@ -226,13 +254,13 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       println()
 
 
-      scheduler.scheduleOnce(7 seconds) {
+      /*scheduler.scheduleOnce(7 seconds) {
         println("Hello, world!")
         controller.matching.cancel()
       }
 
       println("Test waiting.......")
-      TimeUnit.SECONDS.sleep(10)
+      TimeUnit.SECONDS.sleep(10)*/
     }
   }
 

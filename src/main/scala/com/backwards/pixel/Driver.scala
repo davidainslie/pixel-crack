@@ -64,10 +64,8 @@ class Driver(
     }
   }
 
-  /*def stop(): Unit =
-    controller.matching.cancel()*/
-
-  // --------------------------------------------------------------------------
+  def shutdown(): Unit =
+    controller.shutdown()
 
   private def push(out: Output): Unit = out match {
     case m: Match => games.add(m)
@@ -124,7 +122,7 @@ object Driver extends App {
 
   sys addShutdownHook {
     fx.cancel(true)
-    //driver.stop()
+    driver.shutdown()
     executor.shutdown()
   }
 

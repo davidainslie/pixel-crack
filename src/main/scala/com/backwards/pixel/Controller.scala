@@ -2,6 +2,7 @@ package com.backwards.pixel
 
 import java.util.concurrent.TimeUnit
 import scala.collection.mutable
+import scala.concurrent.Promise
 import scala.math._
 import cats.data.State
 import cats.implicits._
@@ -27,12 +28,23 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
       // println(waitingPlayers.mkString("\n"))
   }
 
-  val matching: CancelableFuture[(Triage, List[Match])] =
-    Task {
+  private val matching: CancelableFuture[(Triage, List[Match])] = {
+    def start: Task[(Triage, List[Match])] = Task {
       println("===> Begin matching")
       doMatch().run(Map.empty).value
-    }.executeAsync.runToFuture
-  //Task(doMatch().run(Map.empty).value).executeAsync.runToFuture
+    }
+
+    def stop: Task[Unit] = Task(println("===> Matching ceased"))
+
+    start.doOnCancel(stop).executeAsync.runToFuture
+  }
+
+  private val isShutdown: Promise[Boolean] = Promise[Boolean]()
+
+  def shutdown(): Unit = {
+    matching.cancel()
+    isShutdown.success(true)
+  }
 
   def waitingQueueSnapshot: List[Waiting] =
     waitingQueue.single.get.toList
@@ -42,7 +54,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
       _ <- State.get[Triage]
       _ <- dequeueWaiting
       matches <- State(findMatches)
-      _ <- if (matching.isCompleted) State.get[Triage] else {
+      _ <- if (isShutdown.isCompleted) State.get[Triage] else {
         TimeUnit.SECONDS.sleep(3) // TODO - Remove
         doMatch()
       }
