@@ -131,21 +131,30 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
   }
 
   "Controller managing triage of waiting players" should {
+    def vacate(score: Score): Triage => Triage =
+      _.updatedWith(score)(_ => Nil.some)
+
     "find all same score matches, which will also be evident in an updated triage" in {
       val (newTriage, matches) = findMatches(triage)
 
-      newTriage mustBe triage.updatedWith(Score(0))(_ => Nil.some)
+      newTriage mustBe vacate(Score(0))(triage)
       matches mustBe List(Match(`player 1 beginner`, `player 2 beginner`))
     }
 
-    /*"find all matches both overdue and not, which will also be evident in an updated triage" in {
-      val (newTriage, matches) = findMatches(triage)
+    "find all matches both overdue and not, which will also be evident in an updated triage" in {
+      val triageIncludingOverdue = triage.updatedWith(`player 3 advanced`.score) {
+        _.map(_.map(_.lens(_.elapsedMs).set(`> maxWaitMs elapsed`)))
+      }
 
-      println("=" * 30)
-      println(newTriage)
-      println(matches)
-      println("=" * 30)
-    }*/
+      val (newTriage, matches) = findMatches(triageIncludingOverdue)
+
+      newTriage mustBe (vacate(Score(0)) andThen vacate(Score(3)) andThen vacate(Score(5)))(triage)
+
+      matches mustBe List(
+        Match(`player 3 advanced`, `player 4 topdog`),
+        Match(`player 1 beginner`, `player 2 beginner`)
+      )
+    }
   }
 
 

@@ -78,6 +78,11 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
       (nextTriage, matches)
     }
 
+  /**
+   * Find matches in descending order of player's score i.e. top ranking players are prioritised.
+   * @param triage Triage
+   * @return (Triage, List[Match])
+   */
   def findMatches(triage: Triage): (Triage, List[Match]) = {
     def findMatches(triage: Triage, matches: List[Match]): List[Waiting] => (Triage, List[Match]) = {
       case w +: rest =>
