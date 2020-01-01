@@ -99,22 +99,15 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
     }
 
   def findMatch(waiting: Waiting, triage: Triage): Option[Match] = {
+    def findMatch(player: Player, waitings: Seq[Waiting]): Option[Match] =
+      waitings.headOption.map(_.player).map(createMatch(player, _))
+
     val player = waiting.player
     val waitings: Seq[Waiting] = waitingsOfSameScore(player, triage)
 
     findMatch(player, waitings) orElse {
       Option.when(overdue(waiting))(findMatch(player, waitingsWithinScoreDelta(player, triage))).flatten
     }
-  }
-
-
-
-  def findMatch(player: Player, waitings: Seq[Waiting]): Option[Match] = {
-    val isPlayer: Waiting => Boolean = _.player == player
-
-    val hasPlayed: Waiting => Boolean = _.player.played.contains(player)
-
-    waitings.filterNot(isPlayer).filterNot(hasPlayed).headOption.map(_.player).map(createMatch(player, _))
   }
 
   /**
@@ -124,7 +117,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
    * @return Seq[Waiting]
    */
   def waitingsOfSameScore(player: Player, triage: Triage): Seq[Waiting] =
-    triage.getOrElse(player.score, Nil).filterNot(_.player == player)
+    filter(triage.getOrElse(player.score, Nil))(player)
 
   /**
    * All waiting players within the score delta (maximum configured) of given player,
@@ -140,9 +133,19 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
     val scoresBelow = (lowScore until player.score.value).map(Score.apply).flatMap(triage.get).flatten
     val scoresAbove = (player.score.value + 1 to highScore).map(Score.apply).flatMap(triage.get).flatten
 
-    (scoresBelow ++ scoresAbove).sortWith { (w1, w2) =>
+    val waitings = (scoresBelow ++ scoresAbove).sortWith { (w1, w2) =>
       scoreDelta(w1.player) < scoreDelta(w2.player)
     }
+
+    filter(waitings)(player)
+  }
+
+  def filter(waitings: Seq[Waiting])(player: Player): Seq[Waiting] = {
+    val isPlayer: Waiting => Boolean = _.player == player
+
+    val hasPlayed: Waiting => Boolean = _.player.played.contains(player)
+
+    waitings.filterNot(isPlayer).filterNot(hasPlayed)
   }
 
   def scoreDelta(player: Player): Int =
