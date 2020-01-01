@@ -84,16 +84,20 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
    */
   def findMatches(triage: Triage): (Triage, List[Match]) = {
     def findMatches(triage: Triage, matches: List[Match]): List[Waiting] => (Triage, List[Match]) = {
-      case w +: rest =>
-        findMatch(w, triage).fold(findMatches(triage, matches)(rest)) { newMatch =>
+      case w +: restOfWaiting =>
+        findMatch(w, triage).fold(findMatches(triage, matches)(restOfWaiting)) { newMatch =>
           val stopWaiting: Player => Triage => Triage = { player =>
             _.updatedWith(player.score)(_.map(_.filterNot(_.player == player)))
           }
 
-          val newTriage = (stopWaiting(newMatch.playerA) andThen stopWaiting(newMatch.playerB))(triage)
-          val newRest = rest.filterNot(_.player == newMatch.playerA).filterNot(_.player == newMatch.playerB)
+          val filterMatch: Player => List[Waiting] => List[Waiting] = { player =>
+            _.filterNot(_.player == player)
+          }
 
-          findMatches(newTriage, matches :+ newMatch)(newRest)
+          val nextTriage = (stopWaiting(newMatch.playerA) andThen stopWaiting(newMatch.playerB))(triage)
+          val nextRestOfWaiting = (filterMatch(newMatch.playerA) andThen filterMatch(newMatch.playerB))(restOfWaiting)
+
+          findMatches(nextTriage, matches :+ newMatch)(nextRestOfWaiting)
         }
 
       case _ =>
