@@ -19,10 +19,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
   // TODO - Could use STM Ref
   private val waitingQueue = mutable.Queue.empty[Waiting] // TODO - Thread safe? Need concurrent test
 
-  /*private val highestScore = Ref(Score(0))
-
-  private val waitingPlayers: TMap[Score, List[Waiting]] = TMap.empty[Score, List[Waiting]]
-
+  /*
   val matching: CancelableFuture[Nothing] =
     Task(doMatch()).executeAsync.loopForever.runToFuture*/
 
@@ -160,59 +157,6 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
     else
       Match(player2, player1)
   }
-
-
-  /*
-
-  def doMatch(): List[Match] = {
-    import cats.data.OptionT
-    import cats.data.OptionT._
-
-    val (waiting, startingScore) = atomic { implicit txn =>
-      (waitingPlayers.snapshot, highestScore())
-    }
-
-    val matches: OptionT[List, Match] = for {
-      s  <- liftF((startingScore.value to 0 by -1).toList.map(Score.apply))
-      ws <- fromOption[List](waiting.get(s))
-      w  <- liftF(ws)
-      m  <- fromOption[List](findMatch(w, w.player.score))
-    } yield m
-
-    matches.value.flatten
-  }
-
-  /**
-   * Matching a player in waiting first tries for a player of equal score (as provided by matchingScore).
-   * If none is available but a player has exceeded their wait time,
-   * then look for players of lesser score (as provided by matchingScore.
-   * @param waiting Waiting
-   * @param matchingScore Score
-   * @return Option[Match]
-   */
-  def findMatch(waiting: Waiting, matchingScore: Score): Option[Match] =
-    atomic { implicit txn =>
-      Option.when(waitingPlayers.get(waiting.player.score).exists(_.contains(waiting))) {
-        waitingPlayers.get(matchingScore).flatMap {
-          _.filterNot(_.player == waiting.player).collectFirst {
-            case w: Waiting if matchAllowed(waiting.player, w.player) => w
-          }
-        }
-      } collectFirstSome {
-        case Some(w) => Option(createMatch(waiting, w))
-        case None => unmatched(waiting, matchingScore)
-      }
-    }
-
-  def matchAllowed(player: Player, opponent: Player): Boolean =
-    !player.played.contains(opponent) && player.score.difference(opponent.score) <= Score(config.maxScoreDelta.toInt)
-
-  def unmatched(waiting: Waiting, matchingScore: Score): Option[Match] = {
-    if (waiting.elapsedMs() - waiting.startedMs > config.maxWaitMs)
-      matchingScore.decrement.flatMap(findMatch(waiting, _))
-    else
-      None
-  }*/
 }
 
 object Controller {
