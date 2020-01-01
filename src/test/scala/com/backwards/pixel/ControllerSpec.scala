@@ -59,7 +59,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
 
   import controller._
 
-  "Controller" should {
+  /*"Controller" should {
     "receive players in waiting" in {
       receive(Waiting(`player 1 beginner`))
       receive(Waiting(`player 2 beginner`))
@@ -126,8 +126,6 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
 
       findMatch(waiting, triage) mustBe None
     }
-
-    // TODO - findMatches: State[Triage, List[Match]]
   }
 
   "Controller managing triage of waiting players" should {
@@ -154,6 +152,21 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
         Match(`player 3 advanced`, `player 4 topdog`),
         Match(`player 1 beginner`, `player 2 beginner`)
       )
+    }
+  }*/
+
+  "Controller matching (daemon) task" should {
+    "" in {
+      println(matching)
+
+      monix.execution.Scheduler.global.scheduleOnce(5 seconds) {
+        println("Let's cancel")
+        matching.cancel()
+      }
+
+      println("hi start")
+      doMatch().run(Map.empty).value
+      println("hi end")
     }
   }
 

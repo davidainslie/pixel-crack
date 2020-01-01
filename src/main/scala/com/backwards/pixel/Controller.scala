@@ -7,6 +7,7 @@ import cats.data.State
 import cats.implicits._
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
+import scala.concurrent.stm._
 
 /** We presume this `Controller` is managed somehow such that it is instantiated,
  * receives input somehow, and can appropriately process the output. The config
@@ -16,17 +17,11 @@ import monix.execution.{CancelableFuture, Scheduler}
 class Controller(config: Config, out: Output => Unit)(implicit scheduler: Scheduler) {
   type Triage = Map[Score, List[Waiting]]
 
-  // TODO - Could use STM Ref
-  private val waitingQueue = mutable.Queue.empty[Waiting] // TODO - Thread safe? Need concurrent test
-
-  /*
-  val matching: CancelableFuture[Nothing] =
-    Task(doMatch()).executeAsync.loopForever.runToFuture*/
-
+  private val waitingQueue = Ref(mutable.Queue.empty[Waiting])
 
   val receive: Input => Unit = {
     case w: Waiting =>
-      waitingQueue enqueue w
+      waitingQueue.single.transform(_ enqueue w)
 
       // TODO
       // println(waitingPlayers.mkString("\n"))
@@ -39,9 +34,8 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
     }.executeAsync.runToFuture
   //Task(doMatch().run(Map.empty).value).executeAsync.runToFuture
 
-
   def waitingQueueSnapshot: List[Waiting] =
-    waitingQueue.toList
+    waitingQueue.single.get.toList
 
   def doMatch(): State[Triage, List[Match]] =
     for {
@@ -56,7 +50,13 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
 
   def dequeueWaiting: State[Triage, Unit] =
     State.modify[Triage] { triage =>
-      waitingQueue.dequeueAll(_ => true).foldLeft(triage) { (triage, w) =>
+      println(s"===> dequeue")
+
+      val waitings: Seq[Waiting] = atomic { implicit txn =>
+        waitingQueue().dequeueAll(_ => true)
+      }
+
+      waitings.foldLeft(triage) { (triage, w) =>
         triage.updatedWith(w.player.score) {
           case None => Option(List(w))
           case waiting => waiting.map(_ :+ w)
