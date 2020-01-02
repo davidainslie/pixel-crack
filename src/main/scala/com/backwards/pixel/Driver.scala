@@ -3,7 +3,6 @@ package com.backwards.pixel
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ConcurrentLinkedQueue, ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit}
 import scala.util.Random
-import cats.syntax.all._
 import monix.execution.Scheduler.{global => scheduler}
 
 /** A simple (and dependency-free) driver to provide intuition for how the
@@ -41,8 +40,6 @@ class Driver(
       games.poll() match {
         // Game to complete. We also decide whether to submit the players again, or whether they're quitting for the day.
         case m @ Match(a, b) =>
-          println(s"===> Running (polled a match): match = ${m.show}")
-
           val msg = if (Random.nextBoolean()) {
             GameCompleted(winner = a, b)
           } else {

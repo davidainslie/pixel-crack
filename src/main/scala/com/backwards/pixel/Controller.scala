@@ -67,8 +67,6 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
     } yield matches
 
   def dequeueWaiting(triage: Triage): Triage = {
-    println(s"===> dequeue")
-
     val waitings: Seq[Waiting] = atomic { implicit txn =>
       waitingQueue().dequeueAll(_ => true)
     }
@@ -181,8 +179,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
       Match(player2, player1)
   }
 
-  private def issueMatchEvent(m: Match): Unit =
-    out(m)
+  private def issueMatchEvent(m: Match): Unit = out(m)
 }
 
 object Controller {
