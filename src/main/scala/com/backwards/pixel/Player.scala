@@ -3,7 +3,7 @@ package com.backwards.pixel
 import cats.Show
 import cats.syntax.all._
 
-final case class Player(id: ID, score: Int, played: Set[Player] = Set.empty) {
+final case class Player(id: ID, score: Int, played: Set[ID] = Set.empty) {
   def expired: Boolean = id.expired
 }
 
@@ -12,7 +12,7 @@ object Player {
     Show.show[Player] { player =>
       import player._
 
-      val hasPlayed = played.map(_.id.show) match {
+      val hasPlayed = played.map(_.show) match {
         case ps if ps.isEmpty => "nobody"
         case ps => ps.mkString(", ")
       }

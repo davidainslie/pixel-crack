@@ -157,7 +157,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
   def filter(waitings: Seq[Waiting])(player: Player): Seq[Waiting] = {
     val isPlayer: Waiting => Boolean = _.player == player
 
-    val hasPlayed: Waiting => Boolean = _.player.played.contains(player)
+    val hasPlayed: Waiting => Boolean = _.player.played.contains(player.id)
 
     waitings.filterNot(isPlayer).filterNot(hasPlayed)
   }

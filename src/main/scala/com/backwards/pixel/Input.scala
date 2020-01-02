@@ -29,12 +29,9 @@ object GameCompleted {
 
       // Equation in spec has been adjusted to not allow for a negative score - it seemed odd to see negative scores.
       val score = GenLens[Player](_.score).modify(s => max(0, round(atan(tan(s) + pow(-1, scoreFactor) * max(0.01, abs(s - opponent.score)))).toInt))
-      val played = GenLens[Player](_.played).modify(_ + opponent)
+      val played = GenLens[Player](_.played).modify(_ + opponent.id)
 
-      println(s"===> Before player = ${player.show}")
-      val p = (score compose played)(player)
-      println(s"===> After player = ${p.show}")
-      p
+      (score compose played)(player)
     }
 
     new GameCompleted(update(winner), update(loser)) {}
