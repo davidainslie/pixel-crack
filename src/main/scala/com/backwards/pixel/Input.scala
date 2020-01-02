@@ -22,12 +22,12 @@ sealed abstract case class GameCompleted private(winner: Player, loser: Player) 
 object GameCompleted {
   def apply(winner: Player, loser: Player): GameCompleted = {
     def update(player: Player): Player = {
-      val (opponent, scoreFactor) = player match {
-        case `winner` => (loser, 1)
-        case `loser` => (winner, 0)
+      val (scoreFactor, opponent) = player match {
+        case `winner` => (0, loser)
+        case `loser` => (1, winner)
       }
 
-      val score = GenLens[Player](_.score).modify(s => atan(tan(s) + pow(-1, scoreFactor) * max(0.01, s - opponent.score)).toInt)
+      val score = GenLens[Player](_.score).modify(s => round(atan(tan(s) + pow(-1, scoreFactor) * max(0.01, s - opponent.score))).toInt)
       val played = GenLens[Player](_.played).modify(_ :+ opponent) // TODO - NEED A SET
 
       println(s"===> Before player = ${player.show}")

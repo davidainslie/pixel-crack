@@ -1,3 +1,4 @@
+/*
 package com.backwards.pixel
 
 import cats.implicits._
@@ -29,4 +30,4 @@ object Score {
 
   implicit val scoreShow: Show[Score] =
     Show.show[Score](_.value.toString)
-}
+}*/
