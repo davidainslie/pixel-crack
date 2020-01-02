@@ -27,8 +27,9 @@ object GameCompleted {
         case `loser` => (1, winner)
       }
 
-      val score = GenLens[Player](_.score).modify(s => round(atan(tan(s) + pow(-1, scoreFactor) * max(0.01, s - opponent.score))).toInt)
-      val played = GenLens[Player](_.played).modify(_ :+ opponent) // TODO - NEED A SET
+      // Equation in spec has been adjusted to not allow for a negative score - it seemed odd to see negative scores.
+      val score = GenLens[Player](_.score).modify(s => max(0, round(atan(tan(s) + pow(-1, scoreFactor) * max(0.01, abs(s - opponent.score)))).toInt))
+      val played = GenLens[Player](_.played).modify(_ + opponent)
 
       println(s"===> Before player = ${player.show}")
       val p = (score compose played)(player)
