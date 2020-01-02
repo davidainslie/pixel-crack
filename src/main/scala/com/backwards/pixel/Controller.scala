@@ -19,7 +19,8 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
   type Score = Int // TODO - Originally had a Score ADT but reverted to simply Int, can't decide if this was wise.
   type Triage = Map[Score, List[Waiting]]
 
-  private val waitingQueue = Ref(mutable.Queue.empty[Waiting])
+  private val waitingQueue: Ref[mutable.Queue[Waiting]] =
+    Ref(mutable.Queue.empty[Waiting])
 
   val receive: Input => Unit = {
     case w: Waiting =>
@@ -95,6 +96,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
           val nextTriage = (stopWaiting(newMatch.playerA) andThen stopWaiting(newMatch.playerB))(triage)
           val nextRestOfWaiting = (filterMatch(newMatch.playerA) andThen filterMatch(newMatch.playerB))(restOfWaiting)
 
+          issueMatchEvent(newMatch)
           findMatches(nextTriage, matches :+ newMatch)(nextRestOfWaiting)
         }
 
@@ -173,6 +175,9 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
     else
       Match(player2, player1)
   }
+
+  private def issueMatchEvent(m: Match): Unit =
+    out(m)
 }
 
 object Controller {

@@ -18,7 +18,7 @@ lazy val root = (project in file("."))
       "-language:existentials",
       "-language:postfixOps"
     ),
-    libraryDependencies ++= scalatest ++ scalatestplus ++ scalacheck ++ scalacheckShapeless ++ cats ++ monocle ++ monix ++ stm
+    libraryDependencies ++= scalatest ++ scalatestplus ++ scalacheck ++ scalacheckShapeless ++ scalamock ++ cats ++ monocle ++ monix ++ stm
   )
 
 lazy val scalatest: Seq[ModuleID] = Seq(
@@ -35,6 +35,10 @@ lazy val scalacheck: Seq[ModuleID] = Seq(
 
 lazy val scalacheckShapeless: Seq[ModuleID] = Seq(
   "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % "1.2.3" % Test
+)
+
+lazy val scalamock: Seq[ModuleID] = Seq(
+  "org.scalamock" %% "scalamock" % "4.4.0" % Test
 )
 
 lazy val cats: Seq[ModuleID] = {

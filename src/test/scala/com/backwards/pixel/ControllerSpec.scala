@@ -1,21 +1,25 @@
 package com.backwards.pixel
 
+import scala.concurrent.stm._
 import cats.data.State
 import cats.implicits._
 import monix.execution.schedulers.TestScheduler
 import monocle.macros.syntax.lens._
-import org.scalatest.OneInstancePerTest
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.{Inspectors, OneInstancePerTest}
 
-class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
+class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest with Inspectors {
   implicit val scheduler: TestScheduler = TestScheduler()
 
   val config: Config.Static =
     Config.Static(maxScoreDelta = 5, maxWaitMs = 10)
 
-  val noSideEffect: Output => Unit =
-    _ => ()
+  val issuedMatches: Ref[List[Match]] = Ref(List.empty[Match])
+
+  val issueMatchEvent: Output => Unit = {
+    case m: Match => issuedMatches.single.transform(_ :+ m)
+  }
 
   val `0 elapsed ms`: () => Int =
     () => 0
@@ -54,7 +58,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
     )
   )
 
-  val controller = new Controller(config, noSideEffect)
+  val controller = new Controller(config, issueMatchEvent)
 
   import controller._
 
@@ -135,7 +139,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       val (newTriage, matches) = findMatches(triage)
 
       newTriage mustBe vacate(0)(triage)
-      matches mustBe List(Match(`player 1 beginner`, `player 2 beginner`))
+      forAll(List(matches, issuedMatches.single()))(_ mustBe List(Match(`player 1 beginner`, `player 2 beginner`)))
     }
 
     "find all matches both overdue and not, which will also be evident in an updated triage" in {
@@ -151,6 +155,11 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
         Match(`player 3 advanced`, `player 4 topdog`),
         Match(`player 1 beginner`, `player 2 beginner`)
       )
+
+      forAll(List(matches, issuedMatches.single()))(_ mustBe List(
+        Match(`player 3 advanced`, `player 4 topdog`),
+        Match(`player 1 beginner`, `player 2 beginner`)
+      ))
     }
   }
 
