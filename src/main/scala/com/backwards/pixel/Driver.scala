@@ -27,26 +27,22 @@ class Driver(
   val t = 2
 
   def run(): Unit = {
-    println(s"Current games in play:\n${games.iterator().asScala.map(_.show).mkString("\n")}")
+    println(s"Current number of games in play: ${games.size()}")
 
     // Add new players. We add players at approximately PlayersPerSec.
     (1 to t).foreach(_ => controller.receive(createWaiting(c.getAndIncrement)))
 
-    //println(s"===> Running (added new players): games = $games")
-    //println(s"Current games in play:\n${games.iterator().asScala.map(_.show).mkString("\n")}")
-
     // Probabilistically expire games such that on average they run to MeanGameMs.
-    val q = probabilisticRound(games.size() / meanGameMs * tickMs)
+    //val q = probabilisticRound(games.size() / meanGameMs * tickMs)
+    val q = probabilisticRound(games.size() / 3)
 
     println(s"===> q = $q")
 
     (1 to q).foreach { _ =>
-      println(s"===> Running (lets poll): games = $games")
-
       games.poll() match {
         // Game to complete. We also decide whether to submit the players again, or whether they're quitting for the day.
         case m @ Match(a, b) =>
-          println(s"===> Running (polled a match): match = $m, games = $games")
+          println(s"===> Running (polled a match): match = ${m.show}")
 
           val msg = if (Random.nextBoolean()) {
             GameCompleted(winner = a, b)

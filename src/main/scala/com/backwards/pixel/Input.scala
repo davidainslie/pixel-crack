@@ -16,3 +16,12 @@ object Waiting {
 }
 
 final case class GameCompleted(winner: Player, loser: Player) extends Input
+
+object GameCompleted {
+  implicit val gameCompletedShow: Show[GameCompleted] =
+    Show.show[GameCompleted] { gameCompleted =>
+      import gameCompleted._
+
+      s"Game Completed: winner=${winner.id.show}, loser=${loser.id.show}"
+    }
+}

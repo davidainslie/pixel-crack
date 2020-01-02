@@ -26,8 +26,11 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
     case w: Waiting =>
       waitingQueue.single.transform(_ enqueue w)
 
-      // TODO
-      // println(waitingPlayers.mkString("\n"))
+    case c: GameCompleted =>
+      println(c.show)
+      // At this point I thought about updating each player's score and (re)adding the players into the "waiting" queue.
+      // However, this is done by the Driver (though I've ameneded it to update the scores) where I believe the idea was to have a player in either a "playing" or "waiting" state.
+      // i.e. my approach is a tad different (I didn't pay enough attention to the Driver as the spec indicated not to rely on that code).
   }
 
   private val matching: CancelableFuture[(Triage, List[Match])] = {
