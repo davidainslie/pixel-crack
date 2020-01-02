@@ -67,7 +67,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
     }
 
     "triage empty queue of waiting players" in {
-      val (triage, _) = controller.dequeueWaiting.run(Map.empty).value
+      val triage = dequeueWaiting(Map.empty)
       triage.isEmpty mustBe true
     }
 
@@ -75,7 +75,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest {
       receive(Waiting(`player 1 beginner`))
       receive(Waiting(`player 3 advanced`))
 
-      val (triage, _) = controller.dequeueWaiting.run(Map.empty).value
+      val triage = dequeueWaiting(Map.empty)
 
       triage.size mustBe 2
       triage(`player 1 beginner`.score) mustBe List(Waiting(`player 1 beginner`))

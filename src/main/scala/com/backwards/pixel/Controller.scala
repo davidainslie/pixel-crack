@@ -52,7 +52,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
 
   def doMatch(): State[Triage, List[Match]] =
     for {
-      _ <- dequeueWaiting
+      _ <- State.modify(dequeueWaiting)
       matches <- State(findMatches)
       _ <- if (isShutdown.isCompleted) State.get[Triage] else {
         TimeUnit.SECONDS.sleep(3) // TODO - Remove
@@ -60,21 +60,20 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
       }
     } yield matches
 
-  def dequeueWaiting: State[Triage, Unit] =
-    State.modify[Triage] { triage =>
-      println(s"===> dequeue")
+  def dequeueWaiting(triage: Triage): Triage = {
+    println(s"===> dequeue")
 
-      val waitings: Seq[Waiting] = atomic { implicit txn =>
-        waitingQueue().dequeueAll(_ => true)
-      }
+    val waitings: Seq[Waiting] = atomic { implicit txn =>
+      waitingQueue().dequeueAll(_ => true)
+    }
 
-      waitings.foldLeft(triage) { (triage, w) =>
-        triage.updatedWith(w.player.score) {
-          case None => Option(List(w))
-          case waiting => waiting.map(_ :+ w)
-        }
+    waitings.foldLeft(triage) { (triage, w) =>
+      triage.updatedWith(w.player.score) {
+        case None => Option(List(w))
+        case waiting => waiting.map(_ :+ w)
       }
     }
+  }
 
   /**
    * Find matches in descending order of player's score i.e. top ranking players are prioritised.
