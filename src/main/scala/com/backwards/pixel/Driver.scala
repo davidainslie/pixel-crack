@@ -5,6 +5,7 @@ import java.util.concurrent.{ConcurrentLinkedQueue, ScheduledFuture, ScheduledTh
 import scala.jdk.CollectionConverters._
 import scala.util.Random
 import monix.execution.Scheduler.{global => scheduler}
+import cats.syntax.all._
 
 /** A simple (and dependency-free) driver to provide intuition for how the
  * controller might be called in an example production environment. NOTE, the
@@ -25,13 +26,14 @@ class Driver(
   //val t: Int = probabilisticRound(playersPerSec / 1000 * tickMs)
   val t = 2
 
-  println(s"===> Init: games = ${games.iterator().asScala.toList}")
-
   def run(): Unit = {
+    println(s"Current games in play:\n${games.iterator().asScala.map(_.show).mkString("\n")}")
+
     // Add new players. We add players at approximately PlayersPerSec.
     (1 to t).foreach(_ => controller.receive(createWaiting(c.getAndIncrement)))
 
-    println(s"===> Running (added new players): games = $games")
+    //println(s"===> Running (added new players): games = $games")
+    //println(s"Current games in play:\n${games.iterator().asScala.map(_.show).mkString("\n")}")
 
     // Probabilistically expire games such that on average they run to MeanGameMs.
     val q = probabilisticRound(games.size() / meanGameMs * tickMs)
