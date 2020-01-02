@@ -51,9 +51,11 @@ class Driver(
 
           controller receive msg
 
+          /*
+          Design choice - See synopsis.md
           if (!a.expired) controller receive Waiting(a)
-
           if (!b.expired) controller receive Waiting(b)
+          */
 
         // Possible as games may have changed from the assignment of `q`
         case null => ()

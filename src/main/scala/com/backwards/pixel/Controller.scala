@@ -3,12 +3,12 @@ package com.backwards.pixel
 import java.util.concurrent.TimeUnit
 import scala.collection.mutable
 import scala.concurrent.Promise
+import scala.concurrent.stm._
 import scala.math._
 import cats.data.State
 import cats.implicits._
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
-import scala.concurrent.stm._
 
 /** We presume this `Controller` is managed somehow such that it is instantiated,
  * receives input somehow, and can appropriately process the output. The config
@@ -26,11 +26,13 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
     case w: Waiting =>
       waitingQueue.single.transform(_ enqueue w)
 
-    case c: GameCompleted =>
-      println(c.show)
-      // At this point I thought about updating each player's score and (re)adding the players into the "waiting" queue.
-      // However, this is done by the Driver (though I've ameneded it to update the scores) where I believe the idea was to have a player in either a "playing" or "waiting" state.
-      // i.e. my approach is a tad different (I didn't pay enough attention to the Driver as the spec indicated not to rely on that code).
+    case g: GameCompleted =>
+      println(g.show)
+
+      def issueWaitingEvent(player: Player): Unit =
+        if (!player.expired) receive(Waiting(player))
+
+      List(g.winner, g.loser).foreach(issueWaitingEvent)
   }
 
   private val matching: CancelableFuture[(Triage, List[Match])] = {
