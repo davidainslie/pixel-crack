@@ -2,10 +2,9 @@ package com.backwards.pixel
 
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ConcurrentLinkedQueue, ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit}
-import scala.jdk.CollectionConverters._
 import scala.util.Random
-import monix.execution.Scheduler.{global => scheduler}
 import cats.syntax.all._
+import monix.execution.Scheduler.{global => scheduler}
 
 /** A simple (and dependency-free) driver to provide intuition for how the
  * controller might be called in an example production environment. NOTE, the
