@@ -34,8 +34,6 @@ class Driver(
     //val q = probabilisticRound(games.size() / meanGameMs * tickMs)
     val q = probabilisticRound(games.size() / 3)
 
-    println(s"===> q = $q")
-
     (1 to q).foreach { _ =>
       games.poll() match {
         // Game to complete. We also decide whether to submit the players again, or whether they're quitting for the day.
