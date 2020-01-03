@@ -4,7 +4,7 @@ Synopsis
 Installation Requirements
 -------------------------
 
-SBT/Scala setup for Mac (apologies to everyone else). Firstly you will need
+SBT/Scala setup or Mac (apologies to everyone else). Firstly you will need
 [homebrew](https://brew.sh/):
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ bash
@@ -48,9 +48,7 @@ $ sbt run
 $ sbt '; set javaOptions += "-Dlog.level=debug"; run'
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Some other debug options have been added to watch the driver app in action -
-without these the log output would be overwhelming, and so these options
-basically slow things down (whether it is a good idea to mix in debug code with
+Some other debug options have been added to watch the driver app in action -without these the log output would be overwhelming, and so these options basically slow things down (whether it is a good idea to mix in debug code with
 actual code is certainly debatable, but for demo purposes it was added).
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ bash
