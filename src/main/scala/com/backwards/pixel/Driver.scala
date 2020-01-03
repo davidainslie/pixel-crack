@@ -2,8 +2,9 @@ package com.backwards.pixel
 
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ConcurrentLinkedQueue, ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit}
-import scala.util.Random
+import scala.util.{Random, Try}
 import monix.execution.Scheduler.{global => scheduler}
+import com.backwards.pixel.log.ScribeConfig
 
 /** A simple (and dependency-free) driver to provide intuition for how the
  * controller might be called in an example production environment. NOTE, the
@@ -21,23 +22,26 @@ class Driver(
   val controller: Controller = cf(push)
   val games: ConcurrentLinkedQueue[Match] = new ConcurrentLinkedQueue[Match]
   val c: AtomicInteger = new AtomicInteger(0)
-  //val t: Int = probabilisticRound(playersPerSec / 1000 * tickMs)
-  val t = 2
+
+  val t: Int = sys.props.get("players.per.tick").flatMap(t => Try(t.toInt).toOption).getOrElse {
+    probabilisticRound(playersPerSec / 1000 * tickMs)
+  }
 
   def run(): Unit = {
-    println(s"Current number of games in play: ${games.size()}")
+    scribe debug s"Current number of games in play: ${games.size()}"
 
     // Add new players. We add players at approximately PlayersPerSec.
     (1 to t).foreach(_ => controller.receive(createWaiting(c.getAndIncrement)))
 
     // Probabilistically expire games such that on average they run to MeanGameMs.
-    //val q = probabilisticRound(games.size() / meanGameMs * tickMs)
-    val q = probabilisticRound(games.size() / 3)
+    val q: Int = sys.props.get("games.expire.ratio.per.tick").flatMap(t => Try(t.toInt).toOption).getOrElse {
+      probabilisticRound(games.size() / meanGameMs * tickMs)
+    }
 
     (1 to q).foreach { _ =>
       games.poll() match {
         // Game to complete. We also decide whether to submit the players again, or whether they're quitting for the day.
-        case m @ Match(a, b) =>
+        case Match(a, b) =>
           val msg = if (Random.nextBoolean()) {
             GameCompleted(winner = a, b)
           } else {
@@ -91,7 +95,7 @@ class Driver(
   }
 }
 
-object Driver extends App {
+object Driver extends App with ScribeConfig {
   // How many milliseconds are there between ticks?
   val tickRateMs = 5000
 

@@ -31,8 +31,22 @@ $ sbt test
 
 **Run**
 
+There is one driver/main object to run this application:
+
 ```bash
 $ sbt run
+```
+
+**Run debug**
+
+```bash
+$ sbt '; set javaOptions += "-Dlog.level=debug"; run'
+```
+
+Some other debug options have been added to watch the driver app in action - without these the log output would be overwhelming, and so these options basically slow things down (whether it is a good idea to mix in debug code with actual code is certainly debatable, but for demo purposes it was added).
+
+```bash
+$ sbt '; set javaOptions ++= Seq("-Dlog.level=debug", "-Dplayers.per.tick=2", "-Dgames.expire.ratio.per.tick=3"); run'
 ```
 
 ## Design Choices

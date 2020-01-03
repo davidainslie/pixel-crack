@@ -27,7 +27,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
       waitingQueue.single.transform(_ enqueue w)
 
     case g: GameCompleted =>
-      println(g.show)
+      scribe debug g.show
 
       def issueWaitingEvent(player: Player): Unit =
         if (!player.expired) receive(Waiting(player))
@@ -37,11 +37,11 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
 
   private val matching: CancelableFuture[(Triage, List[Match])] = {
     def start: Task[(Triage, List[Match])] = Task {
-      println("===> Begin matching")
+      scribe info "Begin matching..."
       doMatch().run(Map.empty).value
     }
 
-    def stop: Task[Unit] = Task(println("===> Matching ceased"))
+    def stop: Task[Unit] = Task(scribe info "...Matching ceased")
 
     start.doOnCancel(stop).executeAsync.runToFuture
   }
