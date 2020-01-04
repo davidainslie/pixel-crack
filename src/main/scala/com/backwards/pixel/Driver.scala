@@ -1,7 +1,8 @@
 package com.backwards.pixel
 
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.{ConcurrentLinkedQueue, ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit}
+import java.util.concurrent.{ConcurrentLinkedQueue, Executors, ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit}
+import scala.concurrent.ExecutionContext
 import scala.util.{Random, Try}
 import monix.execution.Scheduler.{global => scheduler}
 import com.backwards.pixel.log.ScribeConfig
@@ -29,6 +30,7 @@ class Driver(
 
   def run(): Unit = {
     scribe debug s"Current number of games in play: ${games.size()}"
+    println(s"Current number of games in play: ${games.size()}")
 
     // Add new players. We add players at approximately PlayersPerSec.
     (1 to t).foreach(_ => controller.receive(createWaiting(c.getAndIncrement)))
@@ -107,7 +109,7 @@ object Driver extends App with ScribeConfig {
   val config = Config.Static(Math.PI, Int.MaxValue)
 
   val driver: Driver = new Driver(
-    Controller(config)(scheduler),
+    Controller(config)(ExecutionContext.fromExecutor(Executors.newCachedThreadPool())),
     elapsedMs,
     playersPerSec = 100,
     meanGameMs = 30 * 1000,

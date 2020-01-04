@@ -1,11 +1,12 @@
 package com.backwards.pixel
 
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.{Executors, TimeUnit}
 import scala.collection.mutable
-import scala.concurrent.Promise
-import scala.concurrent.stm._
+import scala.concurrent.{ExecutionContext, Promise}
 import scala.math._
-import cats.data.State
+import cats.data.{State, StateT}
+import cats.effect.{Async, CancelToken, ContextShift, IO}
+import cats.effect.concurrent.Ref
 import cats.implicits._
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
@@ -15,16 +16,16 @@ import monix.execution.{CancelableFuture, Scheduler}
  * is liable to change during operation. There will be exactly one instance
  * of this controller created per-runtime (but `receive` could be called by
  * multiple parallel threads for instance). */
-class Controller(config: Config, out: Output => Unit)(implicit scheduler: Scheduler) {
+class Controller(config: Config, out: Output => Unit)(implicit ec: ExecutionContext) {
   type Score = Int // TODO - Originally had a Score ADT but reverted to simply Int, can't decide if this was wise.
   type Triage = Map[Score, List[Waiting]]
 
-  private val waitingQueue: Ref[mutable.Queue[Waiting]] =
-    Ref(mutable.Queue.empty[Waiting])
+  private val waitingQueue: Ref[IO, mutable.Queue[Waiting]] =
+    Ref.unsafe[IO, mutable.Queue[Waiting]](mutable.Queue.empty[Waiting])
 
   val receive: Input => Unit = {
     case w: Waiting =>
-      waitingQueue.single.transform(_ enqueue w)
+      waitingQueue.update(_ enqueue w).unsafeRunSync
 
     case g: GameCompleted =>
       scribe debug g.show
@@ -35,42 +36,53 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
       List(g.winner, g.loser).foreach(issueWaitingEvent)
   }
 
-  private val matching: CancelableFuture[(Triage, List[Match])] = {
-    def start: Task[(Triage, List[Match])] = Task {
-      scribe info "Begin matching..."
-      doMatch().run(Map.empty).value
-    }
-
-    def stop: Task[Unit] = Task(scribe info "...Matching ceased")
-
-    start.doOnCancel(stop).executeAsync.runToFuture
-  }
-
   private val isShutdown: Promise[Boolean] = Promise[Boolean]()
 
+  private val matching: CancelToken[IO] = {
+    def start: IO[Triage] = {
+      scribe info "Begin matching..."
+      doMatch(Ref.unsafe[IO, Triage](Map.empty))    //.run(Map.empty).value
+    }
+
+    //def stop: Task[Unit] = Task(scribe info "...Matching ceased")
+
+    //val ec = ExecutionContext.fromExecutor(Executors.newCachedThreadPool()) //create other execution context
+
+    val contextShift: ContextShift[IO] = IO.contextShift(ec)
+
+    contextShift.evalOn(ec)(start).unsafeRunCancelable(_ => ())
+
+    //println(s"====> Hi")
+  }
+
   def shutdown(): Unit = {
-    matching.cancel()
+    //matching.cancel()
+    matching.start
     isShutdown.success(true)
   }
 
   def waitingQueueSnapshot: List[Waiting] =
-    waitingQueue.single.get.toList
+    waitingQueue.get.map(_.toList).unsafeRunSync
 
-  def doMatch(): State[Triage, List[Match]] =
+  def doMatch(tRef: Ref[IO, Triage]): IO[Triage] =
     for {
-      _ <- State.modify(dequeueWaiting)
-      matches <- State(findMatches)
-      _ <- if (isShutdown.isCompleted) State.get[Triage] else {
-        TimeUnit.SECONDS.sleep(3) // TODO - Remove
-        doMatch()
+      /*x <- waitingQueue.get
+      _ = println(s"===========================================> ${x.toList.map(_.show).mkString("\n")}")*/
+      waitings <- waitingQueue.modify { waitings =>
+        println(s"Dequeuing")
+        val ws = waitings.dequeueAll(_ => true)
+        (waitings, ws)
       }
-    } yield matches
+      _ <- tRef.update(blah(waitings))
+      _ <- tRef.update(findMatches)
+      t <- if (isShutdown.isCompleted) tRef.get else {
+        TimeUnit.SECONDS.sleep(3) // TODO - Remove
+        doMatch(tRef)
+      }
+    } yield t
 
-  def dequeueWaiting(triage: Triage): Triage = {
-    val waitings: Seq[Waiting] = atomic { implicit txn =>
-      waitingQueue().dequeueAll(_ => true)
-    }
-
+  def blah(waitings: Seq[Waiting])(triage: Triage): Triage = {
+    println("Blahing")
     waitings.foldLeft(triage) { (triage, w) =>
       triage.updatedWith(w.player.score) {
         case None => Option(List(w))
@@ -84,10 +96,13 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
    * @param triage Triage
    * @return (Triage, List[Match])
    */
-  def findMatches(triage: Triage): (Triage, List[Match]) = {
-    def findMatches(triage: Triage, matches: List[Match]): List[Waiting] => (Triage, List[Match]) = {
+  def findMatches(triage: Triage): Triage = {
+    println("findMatches")
+    def findMatches(triage: Triage, matches: List[Match]): List[Waiting] => Triage = {
       case w +: restOfWaiting =>
         findMatch(w, triage).fold(findMatches(triage, matches)(restOfWaiting)) { newMatch =>
+          println(newMatch.show)
+
           val stopWaiting: Player => Triage => Triage = { player =>
             _.updatedWith(player.score)(_.map(_.filterNot(_.player == player)))
           }
@@ -104,7 +119,8 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
         }
 
       case _ =>
-        (triage, matches)
+        //(triage, matches)
+        triage
     }
 
     val waitings = triage.values.flatten.toList.sortWith(_.player.score > _.player.score)
@@ -129,7 +145,7 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
    * @return Seq[Waiting]
    */
   def waitingsOfSameScore(player: Player, triage: Triage): Seq[Waiting] =
-    filter(triage.getOrElse(player.score, Nil))(player)
+    canPlay(triage.getOrElse(player.score, Nil))(player)
 
   /**
    * All waiting players within the score delta (maximum configured) of given player,
@@ -149,10 +165,10 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
       scoreDelta(player, w1.player) < scoreDelta(player, w2.player)
     }
 
-    filter(waitings)(player)
+    canPlay(waitings)(player)
   }
 
-  def filter(waitings: Seq[Waiting])(player: Player): Seq[Waiting] = {
+  def canPlay(waitings: Seq[Waiting])(player: Player): Seq[Waiting] = {
     val isPlayer: Waiting => Boolean = _.player == player
 
     val hasPlayed: Waiting => Boolean = _.player.played.contains(player.id)
@@ -183,6 +199,6 @@ class Controller(config: Config, out: Output => Unit)(implicit scheduler: Schedu
 }
 
 object Controller {
-  def apply(config: Config)(implicit scheduler: Scheduler): (Output => Unit) => Controller =
+  def apply(config: Config)(implicit ec: ExecutionContext): (Output => Unit) => Controller =
     new Controller(config, _)
 }
