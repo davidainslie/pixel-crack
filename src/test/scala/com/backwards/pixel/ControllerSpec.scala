@@ -1,5 +1,6 @@
 package com.backwards.pixel
 
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.collection.mutable.ListBuffer
 import cats.data.State
 import cats.effect.concurrent.Ref
@@ -64,8 +65,8 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest w
   )
 
   val controller: Controller = new Controller(config, issueMatchEvent) {
-    override def startMatching(matching: IO[(Triage, List[Match])]): Fiber[IO, (Triage, List[Match])] =
-      mock[Fiber[IO, (Triage, List[Match])]]
+    override def startMatching(matching: IO[(Triage, List[Match])]): (Fiber[IO, (Triage, List[Match])], Matching) =
+      mock[Fiber[IO, (Triage, List[Match])]] -> new AtomicBoolean(false)
   }
 
   import controller._
@@ -87,7 +88,29 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest w
       triage(`player 3 advanced`.score) mustBe List(Waiting(`player 3 advanced`))
     }
 
-    // TODO - canPlay ??? Missed this test!
+    "filter out players who cannot play a first time player" in {
+      val player = `player 1 beginner`
+
+      val waitings = List(
+        Waiting(player),
+        Waiting(`player 2 beginner`),
+        Waiting(`player 3 advanced`)
+      )
+
+      canPlay(waitings)(player) mustBe List(Waiting(`player 2 beginner`), Waiting(`player 3 advanced`))
+    }
+
+    "filter out players who cannot play a player that has played" in {
+      val player = `player 1 beginner`.lens(_.played).modify(_ + `player 2 beginner`.id)
+
+      val waitings = List(
+        Waiting(player),
+        Waiting(`player 2 beginner`),
+        Waiting(`player 3 advanced`)
+      )
+
+      canPlay(waitings)(player) mustBe List(Waiting(`player 3 advanced`))
+    }
 
     "create a match (always in the same order) for two given players" in {
       val resultingMatch = Match(`player 1 beginner`, `player 2 beginner`)

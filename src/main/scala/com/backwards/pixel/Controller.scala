@@ -2,7 +2,6 @@ package com.backwards.pixel
 
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.collection.mutable
-import scala.concurrent.Promise
 import scala.concurrent.duration._
 import scala.math._
 import cats.effect.concurrent.Ref
@@ -17,9 +16,7 @@ import cats.implicits._
 class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concurrent[IO], Timer: Timer[IO]) {
   type Score = Int // TODO - Originally had a Score ADT but reverted to simply Int, can't decide if this was wise.
   type Triage = Map[Score, List[Waiting]]
-
-  private val waitingQueue: Ref[IO, mutable.Queue[Waiting]] =
-    Ref.unsafe[IO, mutable.Queue[Waiting]](mutable.Queue.empty[Waiting])
+  type Matching = AtomicBoolean
 
   val receive: Input => Unit = {
     case w: Waiting =>
@@ -34,20 +31,20 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
       List(g.winner, g.loser).foreach(issueWaitingEvent)
   }
 
-  private val doingMatching: AtomicBoolean = new AtomicBoolean(false)
+  private val waitingQueue: Ref[IO, mutable.Queue[Waiting]] =
+    Ref.unsafe[IO, mutable.Queue[Waiting]](mutable.Queue.empty[Waiting])
 
-  private val matching: Fiber[IO, (Triage, List[Match])] =
+  private val matching: (Fiber[IO, (Triage, List[Match])], Matching) =
     startMatching {
-      IO(scribe info "Begin matching...") *> IO(doingMatching set true) *> doMatch(Ref.unsafe[IO, Triage](Map.empty))
+      IO(scribe info "Begin matching...") *> doMatch(Ref.unsafe[IO, Triage](Map.empty))
     }
 
-  def startMatching(matching: IO[(Triage, List[Match])]): Fiber[IO, (Triage, List[Match])] =
-    Concurrent.start(matching).unsafeRunSync
+  def startMatching(matching: IO[(Triage, List[Match])]): (Fiber[IO, (Triage, List[Match])], Matching) =
+    Concurrent.start(matching).unsafeRunSync -> new AtomicBoolean(true)
 
-  def shutdown(): Unit = {
-    matching.cancel
-    doingMatching set false
-  }
+  // TODO - Should have used something like a Resource[_, _] or at least a Bracket to not have to remember to call this
+  def shutdown(): Unit =
+    matching.bimap(_.cancel, _ set false)
 
   def waitingQueueSnapshot: List[Waiting] =
     waitingQueue.get.map(_.toList).unsafeRunSync
@@ -60,7 +57,7 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
       }
       _ <- triage update add(waitings)
       matches <- triage modify findMatches
-      triageAndMatches <- if (doingMatching.get) IO.sleep(1 second) *> doMatch(triage) else triage.get.map(_ -> matches)
+      triageAndMatches <- if (matching._2.get) IO.sleep(1 second) *> doMatch(triage) else triage.get.map(_ -> matches)
     } yield triageAndMatches
 
   def add(waitings: Seq[Waiting])(triage: Triage): Triage =
@@ -145,9 +142,11 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
   }
 
   def canPlay(waitings: Seq[Waiting])(player: Player): Seq[Waiting] = {
-    val isPlayer: Waiting => Boolean = _.player == player
+    val isPlayer: Waiting => Boolean =
+      _.player == player
 
-    val hasPlayed: Waiting => Boolean = _.player.played.contains(player.id)
+    val hasPlayed: Waiting => Boolean =
+      w => player.played.contains(w.player.id)
 
     waitings.filterNot(isPlayer).filterNot(hasPlayed)
   }
