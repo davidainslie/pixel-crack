@@ -4,7 +4,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ConcurrentLinkedQueue, Executors, ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit}
 import scala.concurrent.ExecutionContext
 import scala.util.{Random, Try}
-import monix.execution.Scheduler.{global => scheduler}
+import cats.effect.{Concurrent, ContextShift, IO}
 import com.backwards.pixel.log.ScribeConfig
 
 /** A simple (and dependency-free) driver to provide intuition for how the
@@ -108,8 +108,11 @@ object Driver extends App with ScribeConfig {
   val executor = new ScheduledThreadPoolExecutor(tPoolSize)
   val config = Config.Static(Math.PI, Int.MaxValue)
 
+  val ec = ExecutionContext.fromExecutor(Executors.newCachedThreadPool())
+  implicit val contextShift: ContextShift[IO] = IO.contextShift(ec)
+
   val driver: Driver = new Driver(
-    Controller(config)(ExecutionContext.fromExecutor(Executors.newCachedThreadPool())),
+    Controller(config),
     elapsedMs,
     playersPerSec = 100,
     meanGameMs = 30 * 1000,

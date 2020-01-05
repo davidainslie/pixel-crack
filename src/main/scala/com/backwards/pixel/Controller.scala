@@ -5,18 +5,16 @@ import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Promise}
 import scala.math._
 import cats.data.{State, StateT}
-import cats.effect.{Async, CancelToken, ContextShift, IO}
+import cats.effect.{Async, CancelToken, Concurrent, ContextShift, Fiber, IO}
 import cats.effect.concurrent.Ref
 import cats.implicits._
-import monix.eval.Task
-import monix.execution.{CancelableFuture, Scheduler}
 
 /** We presume this `Controller` is managed somehow such that it is instantiated,
  * receives input somehow, and can appropriately process the output. The config
  * is liable to change during operation. There will be exactly one instance
  * of this controller created per-runtime (but `receive` could be called by
  * multiple parallel threads for instance). */
-class Controller(config: Config, out: Output => Unit)(implicit ec: ExecutionContext) {
+class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concurrent[IO]) {
   type Score = Int // TODO - Originally had a Score ADT but reverted to simply Int, can't decide if this was wise.
   type Triage = Map[Score, List[Waiting]]
 
@@ -38,26 +36,17 @@ class Controller(config: Config, out: Output => Unit)(implicit ec: ExecutionCont
 
   private val isShutdown: Promise[Boolean] = Promise[Boolean]()
 
-  private val matching: CancelToken[IO] = {
-    def start: IO[Triage] = {
+  private val matching: Fiber[IO, Triage] = {
+    def matching: IO[Triage] = {
       scribe info "Begin matching..."
-      doMatch(Ref.unsafe[IO, Triage](Map.empty))    //.run(Map.empty).value
+      doMatch(Ref.unsafe[IO, Triage](Map.empty))
     }
 
-    //def stop: Task[Unit] = Task(scribe info "...Matching ceased")
-
-    //val ec = ExecutionContext.fromExecutor(Executors.newCachedThreadPool()) //create other execution context
-
-    val contextShift: ContextShift[IO] = IO.contextShift(ec)
-
-    contextShift.evalOn(ec)(start).unsafeRunCancelable(_ => ())
-
-    //println(s"====> Hi")
+    Concurrent.start(matching).unsafeRunSync
   }
 
   def shutdown(): Unit = {
-    //matching.cancel()
-    matching.start
+    matching.cancel
     isShutdown.success(true)
   }
 
@@ -199,6 +188,6 @@ class Controller(config: Config, out: Output => Unit)(implicit ec: ExecutionCont
 }
 
 object Controller {
-  def apply(config: Config)(implicit ec: ExecutionContext): (Output => Unit) => Controller =
+  def apply(config: Config)(implicit concurrent: Concurrent[IO]): (Output => Unit) => Controller =
     new Controller(config, _)
 }

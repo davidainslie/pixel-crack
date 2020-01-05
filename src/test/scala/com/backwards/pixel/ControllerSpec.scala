@@ -1,26 +1,29 @@
 package com.backwards.pixel
 
 import java.util.concurrent.Executors
+import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
-import scala.concurrent.stm._
 import cats.data.State
+import cats.effect.laws.util.TestContext
+import cats.effect.{ContextShift, IO}
 import cats.implicits._
-import monix.execution.schedulers.TestScheduler
 import monocle.macros.syntax.lens._
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.{Inspectors, OneInstancePerTest}
 
 class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest with Inspectors {
-  implicit val ec = ExecutionContext.fromExecutor(Executors.newCachedThreadPool())
+  val ec: TestContext = TestContext()
+  implicit val contextShift: ContextShift[IO] = ec.contextShift[IO]
 
   val config: Config.Static =
     Config.Static(maxScoreDelta = 5, maxWaitMs = 10)
 
-  val issuedMatches: Ref[List[Match]] = Ref(List.empty[Match])
+  val issuedMatches: ListBuffer[Match] = new ListBuffer[Match]()
 
   val issueMatchEvent: Output => Unit = {
-    case m: Match => issuedMatches.single.transform(_ :+ m)
+    case m: Match => issuedMatches += m
   }
 
   val `0 elapsed ms`: () => Int =
@@ -90,7 +93,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest w
 
     // TODO - canPlay ??? Missed this test!
 
-    "create a match (always in the same order) for two given players" in {
+    /*"create a match (always in the same order) for two given players" in {
       val resultingMatch = Match(`player 1 beginner`, `player 2 beginner`)
 
       createMatch(`player 1 beginner`, `player 2 beginner`) mustBe resultingMatch
@@ -132,12 +135,12 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest w
       val waiting = Waiting(`player 5 invisible`).lens(_.elapsedMs).set(`> maxWaitMs elapsed`)
 
       findMatch(waiting, triage) mustBe None
-    }
+    }*/
   }
 
   "Controller managing triage of waiting players" should {
-    def vacate(score: Score): Triage => Triage =
-      _.updatedWith(score)(_ => Nil.some)
+    /*def vacate(score: Score): Triage => Triage =
+      _.updatedWith(score)(_ => Nil.some)*/
 
     /*"find all same score matches, which will also be evident in an updated triage" in {
       val (newTriage, matches) = findMatches(triage)

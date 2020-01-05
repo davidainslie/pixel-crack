@@ -16,9 +16,10 @@ lazy val root = (project in file("."))
       "-language:implicitConversions",
       "-language:higherKinds",
       "-language:existentials",
-      "-language:postfixOps"
+      "-language:postfixOps",
+      "-Ywarn-value-discard"
     ),
-    libraryDependencies ++= scalatest ++ scribe ++ cats ++ monocle ++ monix ++ stm
+    libraryDependencies ++= scalatest ++ scribe ++ cats ++ monocle
   )
 
 lazy val scalatest: Seq[ModuleID] = Seq(
@@ -35,7 +36,9 @@ lazy val cats: Seq[ModuleID] = {
 
   Seq(
     "cats-core", "cats-effect"
-  ).map(group %%  _ % version)
+  ).map(group %%  _ % version) ++ Seq(
+    "cats-effect-laws"
+  ).map(group %%  _ % version % Test)
 }
 
 lazy val monocle: Seq[ModuleID] = {
@@ -46,11 +49,3 @@ lazy val monocle: Seq[ModuleID] = {
     "monocle-core", "monocle-macro"
   ).map(group %%  _ % version)
 }
-
-lazy val monix: Seq[ModuleID] = Seq(
-  "io.monix" %% "monix" % "3.1.0"
-)
-
-lazy val stm: Seq[ModuleID] = Seq(
-  "org.scala-stm" %% "scala-stm" % "0.9.1"
-)
