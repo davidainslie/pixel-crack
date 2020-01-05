@@ -64,9 +64,6 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest w
   )
 
   val controller: Controller = new Controller(config, issueMatchEvent) {
-    // This "shutdown" looks odd, but it just prevents the daemon matching from endlessly recursing
-    shutdown()
-
     override def startMatching(matching: IO[(Triage, List[Match])]): Fiber[IO, (Triage, List[Match])] =
       mock[Fiber[IO, (Triage, List[Match])]]
   }

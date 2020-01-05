@@ -1,5 +1,6 @@
 package com.backwards.pixel
 
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.collection.mutable
 import scala.concurrent.Promise
 import scala.concurrent.duration._
@@ -33,11 +34,11 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
       List(g.winner, g.loser).foreach(issueWaitingEvent)
   }
 
-  private val isShutdown: Promise[Boolean] = Promise[Boolean]()
+  private val doingMatching: AtomicBoolean = new AtomicBoolean(false)
 
   private val matching: Fiber[IO, (Triage, List[Match])] =
     startMatching {
-      IO(scribe info "Begin matching...") *> doMatch(Ref.unsafe[IO, Triage](Map.empty))
+      IO(scribe info "Begin matching...") *> IO(doingMatching set true) *> doMatch(Ref.unsafe[IO, Triage](Map.empty))
     }
 
   def startMatching(matching: IO[(Triage, List[Match])]): Fiber[IO, (Triage, List[Match])] =
@@ -45,7 +46,7 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
 
   def shutdown(): Unit = {
     matching.cancel
-    isShutdown.success(true)
+    doingMatching set false
   }
 
   def waitingQueueSnapshot: List[Waiting] =
@@ -59,7 +60,7 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
       }
       _ <- triage update add(waitings)
       matches <- triage modify findMatches
-      triageAndMatches <- if (isShutdown.isCompleted) triage.get.map(_ -> matches) else IO.sleep(1 second) *> doMatch(triage)
+      triageAndMatches <- if (doingMatching.get) IO.sleep(1 second) *> doMatch(triage) else triage.get.map(_ -> matches)
     } yield triageAndMatches
 
   def add(waitings: Seq[Waiting])(triage: Triage): Triage =
