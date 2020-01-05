@@ -6,14 +6,16 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
 import cats.data.State
 import cats.effect.laws.util.TestContext
-import cats.effect.{ContextShift, IO}
+import cats.effect.{CancelToken, Concurrent, ConcurrentEffect, ContextShift, ExitCase, Fiber, IO}
 import cats.implicits._
 import monocle.macros.syntax.lens._
+import org.mockito.scalatest.MockitoSugar
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.{Inspectors, OneInstancePerTest}
+import org.mockito.Mockito._
 
-class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest with Inspectors {
+class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest with Inspectors with MockitoSugar {
   val ec: TestContext = TestContext()
   implicit val contextShift: ContextShift[IO] = ec.contextShift[IO]
 
@@ -63,7 +65,10 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest w
     )
   )
 
-  val controller = new Controller(config, issueMatchEvent)
+  val controller: Controller = new Controller(config, issueMatchEvent) {
+    override def startMatching(matching: IO[Triage]): Fiber[IO, Triage] =
+      mock[Fiber[IO, Triage]]
+  }
 
   import controller._
 

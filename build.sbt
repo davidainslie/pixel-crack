@@ -19,11 +19,15 @@ lazy val root = (project in file("."))
       "-language:postfixOps",
       "-Ywarn-value-discard"
     ),
-    libraryDependencies ++= scalatest ++ scribe ++ cats ++ monocle
+    libraryDependencies ++= scalatest ++ mockito ++ scribe ++ cats ++ monocle
   )
 
 lazy val scalatest: Seq[ModuleID] = Seq(
   "org.scalatest" %% "scalatest" % "3.1.0" % Test
+)
+
+lazy val mockito: Seq[ModuleID] = Seq(
+  "org.mockito" %% "mockito-scala-scalatest" % "1.10.2" % Test
 )
 
 lazy val scribe: Seq[ModuleID] = Seq(

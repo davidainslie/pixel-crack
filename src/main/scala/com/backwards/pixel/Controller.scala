@@ -36,14 +36,13 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
 
   private val isShutdown: Promise[Boolean] = Promise[Boolean]()
 
-  private val matching: Fiber[IO, Triage] = {
-    def matching: IO[Triage] = {
-      scribe info "Begin matching..."
-      doMatch(Ref.unsafe[IO, Triage](Map.empty))
+  private val matching: Fiber[IO, Triage] =
+    startMatching {
+      IO(scribe info "Begin matching...") *> doMatch(Ref.unsafe[IO, Triage](Map.empty))
     }
 
+  def startMatching(matching: IO[Triage]): Fiber[IO, Triage] =
     Concurrent.start(matching).unsafeRunSync
-  }
 
   def shutdown(): Unit = {
     matching.cancel
@@ -53,7 +52,7 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
   def waitingQueueSnapshot: List[Waiting] =
     waitingQueue.get.map(_.toList).unsafeRunSync
 
-  def doMatch(tRef: Ref[IO, Triage]): IO[Triage] =
+  def doMatch(tRef: => Ref[IO, Triage]): IO[Triage] =
     for {
       /*x <- waitingQueue.get
       _ = println(s"===========================================> ${x.toList.map(_.show).mkString("\n")}")*/
