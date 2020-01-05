@@ -52,7 +52,7 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
   def waitingQueueSnapshot: List[Waiting] =
     waitingQueue.get.map(_.toList).unsafeRunSync
 
-  def doMatch(tRef: => Ref[IO, Triage]): IO[Triage] =
+  def doMatch(tRef: Ref[IO, Triage]): IO[Triage] =
     for {
       /*x <- waitingQueue.get
       _ = println(s"===========================================> ${x.toList.map(_.show).mkString("\n")}")*/
@@ -70,7 +70,7 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
     } yield t
 
   def blah(waitings: Seq[Waiting])(triage: Triage): Triage = {
-    println("Blahing")
+    println(s"Blahing ${waitings.map(_.show).mkString("\n")}")
     waitings.foldLeft(triage) { (triage, w) =>
       triage.updatedWith(w.player.score) {
         case None => Option(List(w))
