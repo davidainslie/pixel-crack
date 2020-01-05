@@ -1,23 +1,21 @@
 package com.backwards.pixel
 
-import java.util.concurrent.Executors
-import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.ExecutionContext
 import cats.data.State
+import cats.effect.concurrent.Ref
 import cats.effect.laws.util.TestContext
-import cats.effect.{CancelToken, Concurrent, ConcurrentEffect, ContextShift, ExitCase, Fiber, IO}
+import cats.effect.{ContextShift, Fiber, IO, Timer}
 import cats.implicits._
 import monocle.macros.syntax.lens._
 import org.mockito.scalatest.MockitoSugar
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.{Inspectors, OneInstancePerTest}
-import org.mockito.Mockito._
 
 class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest with Inspectors with MockitoSugar {
   val ec: TestContext = TestContext()
   implicit val contextShift: ContextShift[IO] = ec.contextShift[IO]
+  implicit val timer: Timer[IO] = IO.timer(ec)
 
   val config: Config.Static =
     Config.Static(maxScoreDelta = 5, maxWaitMs = 10)
@@ -66,8 +64,11 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest w
   )
 
   val controller: Controller = new Controller(config, issueMatchEvent) {
-    override def startMatching(matching: IO[Triage]): Fiber[IO, Triage] =
-      mock[Fiber[IO, Triage]]
+    // This "shutdown" looks odd, but it just prevents the daemon matching from endlessly recursing
+    shutdown()
+
+    override def startMatching(matching: IO[(Triage, List[Match])]): Fiber[IO, (Triage, List[Match])] =
+      mock[Fiber[IO, (Triage, List[Match])]]
   }
 
   import controller._
@@ -80,25 +81,18 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest w
       waitingQueueSnapshot mustBe List(Waiting(`player 1 beginner`), Waiting(`player 2 beginner`))
     }
 
-    /*"triage empty queue of waiting players" in {
-      val triage = dequeueWaiting(Map.empty)
-      triage.isEmpty mustBe true
-    }*/
-
-    /*"triage waiting players that have been queued" in {
-      receive(Waiting(`player 1 beginner`))
-      receive(Waiting(`player 3 advanced`))
-
-      val triage = dequeueWaiting(Map.empty)
+    "triage waiting players" in {
+      val waitings = List(Waiting(`player 1 beginner`), Waiting(`player 3 advanced`))
+      val triage = add(waitings)(Map.empty)
 
       triage.size mustBe 2
       triage(`player 1 beginner`.score) mustBe List(Waiting(`player 1 beginner`))
       triage(`player 3 advanced`.score) mustBe List(Waiting(`player 3 advanced`))
-    }*/
+    }
 
     // TODO - canPlay ??? Missed this test!
 
-    /*"create a match (always in the same order) for two given players" in {
+    "create a match (always in the same order) for two given players" in {
       val resultingMatch = Match(`player 1 beginner`, `player 2 beginner`)
 
       createMatch(`player 1 beginner`, `player 2 beginner`) mustBe resultingMatch
@@ -140,21 +134,21 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest w
       val waiting = Waiting(`player 5 invisible`).lens(_.elapsedMs).set(`> maxWaitMs elapsed`)
 
       findMatch(waiting, triage) mustBe None
-    }*/
+    }
   }
 
   "Controller managing triage of waiting players" should {
-    /*def vacate(score: Score): Triage => Triage =
-      _.updatedWith(score)(_ => Nil.some)*/
+    def vacate(score: Score): Triage => Triage =
+      _.updatedWith(score)(_ => Nil.some)
 
-    /*"find all same score matches, which will also be evident in an updated triage" in {
+    "find all same score matches, which will also be evident in an updated triage" in {
       val (newTriage, matches) = findMatches(triage)
 
       newTriage mustBe vacate(0)(triage)
-      forAll(List(matches, issuedMatches.single()))(_ mustBe List(Match(`player 1 beginner`, `player 2 beginner`)))
-    }*/
+      forAll(List(matches, issuedMatches))(_ mustBe List(Match(`player 1 beginner`, `player 2 beginner`)))
+    }
 
-    /*"find all matches both overdue and not, which will also be evident in an updated triage" in {
+    "find all matches both overdue and not, which will also be evident in an updated triage" in {
       val triageIncludingOverdue = triage.updatedWith(`player 3 advanced`.score) {
         _.map(_.map(_.lens(_.elapsedMs).set(`> maxWaitMs elapsed`)))
       }
@@ -168,18 +162,15 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest w
         Match(`player 1 beginner`, `player 2 beginner`)
       )
 
-      forAll(List(matches, issuedMatches.single()))(_ mustBe List(
+      forAll(List(matches, issuedMatches))(_ mustBe List(
         Match(`player 3 advanced`, `player 4 topdog`),
         Match(`player 1 beginner`, `player 2 beginner`)
       ))
-    }*/
+    }
   }
 
-  /*"Controller matching (daemon) task" should {
+  "Controller matching (daemon) task" should {
     "match a bunch of players" in {
-      // This "shutdown" looks odd, but it just prevents the daemon matching from endlessly recursing
-      shutdown()
-
       val numberOfScores = 10
       val numberOfPlayersPerScore = 10
 
@@ -195,10 +186,10 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest w
 
       players.map(Waiting.apply).foreach(receive)
 
-      val (triage, matches) = doMatch().run(Map.empty).value
+      val (triage, matches) = doMatch(Ref.unsafe[IO, Triage](Map.empty)).unsafeRunSync
 
       triage.values.flatten mustBe Nil
       matches.size mustBe (numberOfScores * numberOfPlayersPerScore / 2)
     }
-  }*/
+  }
 }

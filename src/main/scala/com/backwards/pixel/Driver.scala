@@ -1,10 +1,10 @@
 package com.backwards.pixel
 
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.{ConcurrentLinkedQueue, Executors, ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit}
+import java.util.concurrent._
 import scala.concurrent.ExecutionContext
 import scala.util.{Random, Try}
-import cats.effect.{Concurrent, ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import com.backwards.pixel.log.ScribeConfig
 
 /** A simple (and dependency-free) driver to provide intuition for how the
@@ -30,7 +30,6 @@ class Driver(
 
   def run(): Unit = {
     scribe debug s"Current number of games in play: ${games.size()}"
-    println(s"Current number of games in play: ${games.size()}")
 
     // Add new players. We add players at approximately PlayersPerSec.
     (1 to t).foreach(_ => controller.receive(createWaiting(c.getAndIncrement)))
@@ -110,6 +109,7 @@ object Driver extends App with ScribeConfig {
 
   val ec = ExecutionContext.fromExecutor(Executors.newCachedThreadPool())
   implicit val contextShift: ContextShift[IO] = IO.contextShift(ec)
+  implicit val timer: Timer[IO] = IO.timer(ec)
 
   val driver: Driver = new Driver(
     Controller(config),

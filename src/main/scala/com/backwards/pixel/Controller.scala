@@ -1,12 +1,11 @@
 package com.backwards.pixel
 
-import java.util.concurrent.{Executors, TimeUnit}
 import scala.collection.mutable
-import scala.concurrent.{ExecutionContext, Promise}
+import scala.concurrent.Promise
+import scala.concurrent.duration._
 import scala.math._
-import cats.data.{State, StateT}
-import cats.effect.{Async, CancelToken, Concurrent, ContextShift, Fiber, IO}
 import cats.effect.concurrent.Ref
+import cats.effect.{Concurrent, Fiber, IO, Timer}
 import cats.implicits._
 
 /** We presume this `Controller` is managed somehow such that it is instantiated,
@@ -14,7 +13,7 @@ import cats.implicits._
  * is liable to change during operation. There will be exactly one instance
  * of this controller created per-runtime (but `receive` could be called by
  * multiple parallel threads for instance). */
-class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concurrent[IO]) {
+class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concurrent[IO], Timer: Timer[IO]) {
   type Score = Int // TODO - Originally had a Score ADT but reverted to simply Int, can't decide if this was wise.
   type Triage = Map[Score, List[Waiting]]
 
@@ -36,12 +35,12 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
 
   private val isShutdown: Promise[Boolean] = Promise[Boolean]()
 
-  private val matching: Fiber[IO, Triage] =
+  private val matching: Fiber[IO, (Triage, List[Match])] =
     startMatching {
       IO(scribe info "Begin matching...") *> doMatch(Ref.unsafe[IO, Triage](Map.empty))
     }
 
-  def startMatching(matching: IO[Triage]): Fiber[IO, Triage] =
+  def startMatching(matching: IO[(Triage, List[Match])]): Fiber[IO, (Triage, List[Match])] =
     Concurrent.start(matching).unsafeRunSync
 
   def shutdown(): Unit = {
@@ -52,45 +51,34 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
   def waitingQueueSnapshot: List[Waiting] =
     waitingQueue.get.map(_.toList).unsafeRunSync
 
-  def doMatch(tRef: Ref[IO, Triage]): IO[Triage] =
+  def doMatch(triage: Ref[IO, Triage]): IO[(Triage, List[Match])] =
     for {
-      /*x <- waitingQueue.get
-      _ = println(s"===========================================> ${x.toList.map(_.show).mkString("\n")}")*/
-      waitings <- waitingQueue.modify { waitings =>
-        println(s"Dequeuing")
+      waitings <- waitingQueue modify { waitings =>
         val ws = waitings.dequeueAll(_ => true)
         (waitings, ws)
       }
-      _ <- tRef.update(blah(waitings))
-      _ <- tRef.update(findMatches)
-      t <- if (isShutdown.isCompleted) tRef.get else {
-        TimeUnit.SECONDS.sleep(3) // TODO - Remove
-        doMatch(tRef)
-      }
-    } yield t
+      _ <- triage update add(waitings)
+      matches <- triage modify findMatches
+      triageAndMatches <- if (isShutdown.isCompleted) triage.get.map(_ -> matches) else IO.sleep(1 second) *> doMatch(triage)
+    } yield triageAndMatches
 
-  def blah(waitings: Seq[Waiting])(triage: Triage): Triage = {
-    println(s"Blahing ${waitings.map(_.show).mkString("\n")}")
+  def add(waitings: Seq[Waiting])(triage: Triage): Triage =
     waitings.foldLeft(triage) { (triage, w) =>
       triage.updatedWith(w.player.score) {
         case None => Option(List(w))
         case waiting => waiting.map(_ :+ w)
       }
     }
-  }
 
   /**
    * Find matches in descending order of player's score i.e. top ranking players are prioritised.
    * @param triage Triage
    * @return (Triage, List[Match])
    */
-  def findMatches(triage: Triage): Triage = {
-    println("findMatches")
-    def findMatches(triage: Triage, matches: List[Match]): List[Waiting] => Triage = {
+  def findMatches(triage: Triage): (Triage, List[Match]) = {
+    def findMatches(triage: Triage, matches: List[Match]): List[Waiting] => (Triage, List[Match]) = {
       case w +: restOfWaiting =>
         findMatch(w, triage).fold(findMatches(triage, matches)(restOfWaiting)) { newMatch =>
-          println(newMatch.show)
-
           val stopWaiting: Player => Triage => Triage = { player =>
             _.updatedWith(player.score)(_.map(_.filterNot(_.player == player)))
           }
@@ -107,8 +95,7 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
         }
 
       case _ =>
-        //(triage, matches)
-        triage
+        (triage, matches)
     }
 
     val waitings = triage.values.flatten.toList.sortWith(_.player.score > _.player.score)
@@ -187,6 +174,6 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
 }
 
 object Controller {
-  def apply(config: Config)(implicit concurrent: Concurrent[IO]): (Output => Unit) => Controller =
+  def apply(config: Config)(implicit concurrent: Concurrent[IO], Timer: Timer[IO]): (Output => Unit) => Controller =
     new Controller(config, _)
 }
