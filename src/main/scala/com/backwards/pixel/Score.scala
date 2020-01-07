@@ -1,37 +1,22 @@
 package com.backwards.pixel
 
 import cats.implicits._
-import cats.{Monoid, Order, Show}
-import scala.math.abs
+import cats.{Order, Show}
+import com.backwards.pixel.Score._
 
-// TODO - Smart constructor or Refined to avoid possible negative.
-// TODO - However, the use of this ADT has been removed (maybe good idea or maybe not)
 final case class Score private(value: BigDecimal) extends AnyVal {
-  /*def decrement: Option[Score] = {
-    val nextValue = value - 1
+  def increment: Score =
+    Score(value + new java.math.BigDecimal(1).movePointLeft(precision))
 
-    if (nextValue >= 0)
-      Option(Score(nextValue))
-    else
-      None
-  }*/
-
-  def difference(other: Score): Score =
-    Score(abs(value.toDouble - other.value.toDouble))
-
-  def minus(other: Score): Score =
-    Score(value.toDouble - other.value.toDouble)
+  def toDouble: Double = value.toDouble
 }
 
-// println(BigDecimal(1.23456789).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble)
-
 object Score {
-  def apply(value: Double): Score = new Score(BigDecimal(value).setScale(2, BigDecimal.RoundingMode.HALF_UP))
-    //throw new NotImplementedError
+  val precision: Int = 2
 
-  /*implicit val scoreMonoid: Monoid[Score] =
-    Monoid.instance[Score](Score(0), (s1, s2) => Score(s1.value |+| s2.value))
-*/
+  def apply(value: Double): Score = apply(BigDecimal(value))
+
+  def apply(value: BigDecimal): Score = new Score(value.setScale(precision, BigDecimal.RoundingMode.HALF_UP))
 
   implicit val scoreOrder: Order[Score] =
     (x: Score, y: Score) => x.value.compare(y.value)

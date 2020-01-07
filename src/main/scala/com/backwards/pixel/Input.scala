@@ -19,6 +19,12 @@ object Waiting {
 
 final case class GameCompleted private(winner: Player, loser: Player) extends Input
 
+/**
+ * {{{
+ *  S_{new} = atan(tan(S_{old}) + (-1)^n * max(0.01, |S_{old}-S_{opponent}|)),
+ *  where n=1 if they have lost and n=0 if they have won the game in question.
+ * }}}
+ */
 object GameCompleted {
   def apply(winner: Player, loser: Player): GameCompleted = {
     def update(player: Player): Player = {
@@ -27,21 +33,10 @@ object GameCompleted {
         case `loser` => (1, winner)
       }
 
-      val s = 1.47
-      val op = 0
-      //println(BigDecimal(1.23456789).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble)
+      val score = GenLens[Player](_.score).modify { s =>
+        Score(max(0, atan(tan(s.toDouble) + pow(-1, scoreFactor) * max(0.01, abs(s.toDouble - opponent.score.toDouble)))))
+      }
 
-      val v = max(0, atan(tan(s) + pow(-1, 0) * max(0.01, abs(s - op))))
-      println(v)
-
-      /*
-      S_{new} = atan(tan(S_{old}) + (-1)^n * max(0.01, |S_{old}-S_{opponent}|)),
-      where n=1 if they have lost and n=0 if they have won the game in question.
-
-       */
-
-      // Equation in spec has been adjusted to not allow for a negative score - it seemed odd to see negative scores.
-      val score = GenLens[Player](_.score).modify(s => max(0, round(atan(tan(s) + pow(-1, scoreFactor) * max(0.01, abs(s - opponent.score)))).toInt))
       val played = GenLens[Player](_.played).modify(_ + opponent.id)
 
       (score compose played)(player)
@@ -54,6 +49,6 @@ object GameCompleted {
     Show.show[GameCompleted] { gameCompleted =>
       import gameCompleted._
 
-      s"Game Completed: winner=${winner.id.show}, loser=${loser.id.show}"
+      s"Game Completed: winner=${winner.id.show}(${winner.score.show}), loser=${loser.id.show}(${loser.score.show})"
     }
 }

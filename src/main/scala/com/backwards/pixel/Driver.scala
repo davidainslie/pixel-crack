@@ -76,7 +76,7 @@ class Driver(
     // track of it separately; and, we use the sequence number `i` as a means of
     // discriminating players who would otherwise expire at the same instant.
     val t: Int = elapsedMs() + gamesPerPlayer * meanGameMs
-    val player = Player(ID(i.toLong << 32 | t & 0xFFFFFFFFL, elapsedMs), score = 0)
+    val player = Player(ID(i.toLong << 32 | t & 0xFFFFFFFFL, elapsedMs), Score(0))
 
     Waiting(player)
   }
@@ -105,7 +105,7 @@ object Driver extends App with ScribeConfig {
 
   // Setup controller, etc.
   val executor = new ScheduledThreadPoolExecutor(tPoolSize)
-  val config = Config.Static(Math.PI, Int.MaxValue)
+  val config = Config.Static(0.05 /*Math.PI*/, Int.MaxValue)
 
   val ec = ExecutionContext.fromExecutor(Executors.newCachedThreadPool())
   implicit val contextShift: ContextShift[IO] = IO.contextShift(ec)

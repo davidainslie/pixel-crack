@@ -6,6 +6,7 @@ import org.scalacheck.Gen.Choose
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
+import com.backwards.pixel.ScoreNumeric._
 
 class ScoreSpec extends AnyWordSpec with Matchers with ScalaCheckDrivenPropertyChecks {
   "Score" should {
@@ -18,6 +19,11 @@ class ScoreSpec extends AnyWordSpec with Matchers with ScalaCheckDrivenPropertyC
       forAll(doubleGen) { d =>
         iso.reverseGet(iso.get(d)) mustBe d
       }
+    }
+
+    "be numeric" in {
+      Score(0) + Score(2) mustBe Score(2)
+      Score(1.723) + Score(5.2) mustBe Score(6.92)
     }
   }
 }

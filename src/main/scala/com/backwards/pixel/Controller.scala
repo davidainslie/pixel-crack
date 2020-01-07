@@ -3,10 +3,10 @@ package com.backwards.pixel
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.collection.mutable
 import scala.concurrent.duration._
-import scala.math._
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, Fiber, IO, Timer}
 import cats.implicits._
+import com.backwards.pixel.ScoreNumeric._
 
 /** We presume this `Controller` is managed somehow such that it is instantiated,
  * receives input somehow, and can appropriately process the output. The config
@@ -127,15 +127,11 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
    * @return Seq[Waiting]
    */
   def waitingsWithinScoreDelta(player: Player, triage: Triage): Seq[Waiting] = {
-
-
-    val lowScore = BigDecimal(0).max(player.score.minus(Score(config.maxScoreDelta)).value)
-    val highScore = (player.score.value.toDouble + config.maxScoreDelta)
-
-    scala.collection.immutable.Range.BigDecimal(lowScore, player.score, step)
+    val lowScore = max(Score(0), player.score - Score(config.maxScoreDelta))
+    val highScore = player.score + Score(config.maxScoreDelta)
 
     val scoresBelow = (lowScore until player.score).flatMap(triage.get).flatten
-    val scoresAbove = (player.score + 1 to highScore).flatMap(triage.get).flatten
+    val scoresAbove = (player.score.increment to highScore).flatMap(triage.get).flatten
 
     val waitings = (scoresBelow ++ scoresAbove).sortWith { (w1, w2) =>
       scoreDelta(player, w1.player) < scoreDelta(player, w2.player)
@@ -154,7 +150,7 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
     waitings.filterNot(isPlayer).filterNot(hasPlayed)
   }
 
-  def scoreDelta(p1: Player, p2: Player): Int =
+  def scoreDelta(p1: Player, p2: Player): Score =
     abs(p1.score - p2.score)
 
   def overdue(waiting: Waiting): Boolean =
