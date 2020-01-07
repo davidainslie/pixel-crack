@@ -2,7 +2,6 @@ package com.backwards.pixel
 
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.collection.mutable.ListBuffer
-import cats.data.State
 import cats.effect.concurrent.Ref
 import cats.effect.laws.util.TestContext
 import cats.effect.{ContextShift, Fiber, IO, Timer}
@@ -12,6 +11,7 @@ import org.mockito.scalatest.MockitoSugar
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.{Inspectors, OneInstancePerTest}
+import com.backwards.pixel.ScoreNumeric._
 
 class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest with Inspectors with MockitoSugar {
   val ec: TestContext = TestContext()
@@ -184,27 +184,20 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest w
     }
   }
 
-  /*"Controller matching (daemon) task" should {
+  "Controller matching (daemon) task" should {
     "match a bunch of players" in {
-      val numberOfScores = 10
-      val numberOfPlayersPerScore = 10
-
-      def createPlayers(score: Int): State[List[Player], Unit] =
-        for {
-          _ <- State.modify[List[Player]] {
-            _ ++ (score until score + numberOfPlayersPerScore).map(id => Player(ID(id, `0 elapsed ms`), score))
-          }
-          _ <- if (score >= numberOfScores) State.get[List[Player]] else createPlayers(score + 1)
-        } yield ()
-
-      val (players, _) = createPlayers(1).run(List.empty[Player]).value
+      val players: Seq[Player] = for {
+        s <- Score(0) until Score(0.1)
+        idSeed = (s.toDouble * 1000).toInt
+        id <- idSeed to (9 + idSeed)
+      } yield Player(ID(id, `0 elapsed ms`), s)
 
       players.map(Waiting.apply).foreach(receive)
 
       val (triage, matches) = doMatch(Ref.unsafe[IO, Triage](Map.empty)).unsafeRunSync
 
       triage.values.flatten mustBe Nil
-      matches.size mustBe (numberOfScores * numberOfPlayersPerScore / 2)
+      matches.size mustBe 50
     }
-  }*/
+  }
 }
