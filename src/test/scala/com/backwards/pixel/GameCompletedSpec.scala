@@ -25,7 +25,7 @@ class GameCompletedSpec extends AnyWordSpec with Matchers {
         Player(ID(1, `0 elapsed ms`), score = 0)
 
       val player2: Player =
-        Player(ID(2, `0 elapsed ms`), score = 99)
+        Player(ID(2, `0 elapsed ms`), score = 9)
 
       val GameCompleted(player2Wins, player1Loses) = GameCompleted(winner = player2, loser = player1)
       player2Wins mustBe (score(2) compose played(player1Loses))(player2)

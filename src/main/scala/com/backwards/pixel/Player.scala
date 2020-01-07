@@ -3,7 +3,7 @@ package com.backwards.pixel
 import cats.Show
 import cats.syntax.all._
 
-final case class Player(id: ID, score: Int, played: Set[ID] = Set.empty) {
+final case class Player(id: ID, score: Score, played: Set[ID] = Set.empty) {
   def expired: Boolean = id.expired
 }
 

@@ -14,7 +14,6 @@ import cats.implicits._
  * of this controller created per-runtime (but `receive` could be called by
  * multiple parallel threads for instance). */
 class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concurrent[IO], Timer: Timer[IO]) {
-  type Score = Int // TODO - Originally had a Score ADT but reverted to simply Int, can't decide if this was wise.
   type Triage = Map[Score, List[Waiting]]
   type Matching = AtomicBoolean
 
@@ -128,8 +127,12 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
    * @return Seq[Waiting]
    */
   def waitingsWithinScoreDelta(player: Player, triage: Triage): Seq[Waiting] = {
-    val lowScore = max(0, player.score - config.maxScoreDelta).toInt
-    val highScore = (player.score + config.maxScoreDelta).toInt
+
+
+    val lowScore = BigDecimal(0).max(player.score.minus(Score(config.maxScoreDelta)).value)
+    val highScore = (player.score.value.toDouble + config.maxScoreDelta)
+
+    scala.collection.immutable.Range.BigDecimal(lowScore, player.score, step)
 
     val scoresBelow = (lowScore until player.score).flatMap(triage.get).flatten
     val scoresAbove = (player.score + 1 to highScore).flatMap(triage.get).flatten
@@ -146,7 +149,7 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
       _.player == player
 
     val hasPlayed: Waiting => Boolean =
-      w => player.played.contains(w.player.id)
+      w => player.played.contains(w.player.id) || w.player.played.contains(player.id)
 
     waitings.filterNot(isPlayer).filterNot(hasPlayed)
   }
