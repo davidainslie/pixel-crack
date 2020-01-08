@@ -39,12 +39,11 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
       IO(scribe info "Begin matching...") *> doMatch(Ref.unsafe[IO, Triage](Map.empty))
     }
 
-  def startMatching(matching: IO[(Triage, List[Match])]): (Fiber[IO, (Triage, List[Match])], Matching) =
-    Concurrent.start(matching).unsafeRunSync -> new AtomicBoolean(true)
+  def startMatching(matching: IO[(Triage, List[Match])]): (Fiber[IO, (Triage, List[Match])], Matching) = {
+    sys addShutdownHook this.matching.bimap(_.cancel, _ set false)
 
-  // TODO - Should have used something like a Resource[_, _] or at least a Bracket to not have to remember to call this
-  def shutdown(): Unit =
-    matching.bimap(_.cancel, _ set false)
+    Concurrent.start(matching).unsafeRunSync -> new AtomicBoolean(true)
+  }
 
   def waitingQueueSnapshot: List[Waiting] =
     waitingQueue.get.map(_.toList).unsafeRunSync
@@ -57,7 +56,8 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
       }
       _ <- triage update add(waitings)
       matches <- triage modify findMatches
-      triageAndMatches <- if (matching._2.get) IO.sleep(1 second) *> doMatch(triage) else triage.get.map(_ -> matches)
+      (_, isMatching) = matching.map(_.get)
+      triageAndMatches <- if (isMatching) IO.sleep(1 second) *> doMatch(triage) else triage.get.map(_ -> matches)
     } yield triageAndMatches
 
   def add(waitings: Seq[Waiting])(triage: Triage): Triage =

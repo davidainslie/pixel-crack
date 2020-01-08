@@ -28,10 +28,7 @@ final case class GameCompleted private(winner: Player, loser: Player) extends In
 object GameCompleted {
   def apply(winner: Player, loser: Player): GameCompleted = {
     def update(player: Player): Player = {
-      val (scoreFactor, opponent) = player match {
-        case `winner` => (0, loser)
-        case `loser` => (1, winner)
-      }
+      val (scoreFactor, opponent) = if (player == winner) (0, loser) else (1, winner)
 
       val score = GenLens[Player](_.score).modify { s =>
         Score(max(0, atan(tan(s.toDouble) + pow(-1, scoreFactor) * max(0.01, abs(s.toDouble - opponent.score.toDouble)))))

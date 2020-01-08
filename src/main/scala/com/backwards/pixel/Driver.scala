@@ -63,9 +63,6 @@ class Driver(
     }
   }
 
-  def shutdown(): Unit =
-    controller.shutdown()
-
   private def push(out: Output): Unit = out match {
     case m: Match => games.add(m)
   }
@@ -105,7 +102,7 @@ object Driver extends App with ScribeConfig {
 
   // Setup controller, etc.
   val executor = new ScheduledThreadPoolExecutor(tPoolSize)
-  val config = Config.Static(0.05 /*Math.PI*/, Int.MaxValue)
+  val config = Config.Static(0.1 /*Math.PI*/, Int.MaxValue)
 
   val ec = ExecutionContext.fromExecutor(Executors.newCachedThreadPool())
   implicit val contextShift: ContextShift[IO] = IO.contextShift(ec)
@@ -125,7 +122,6 @@ object Driver extends App with ScribeConfig {
 
   sys addShutdownHook {
     fx.cancel(true)
-    driver.shutdown()
     executor.shutdown()
   }
 
