@@ -1,6 +1,7 @@
 package com.backwards.pixel
 
 import java.util.concurrent.atomic.AtomicBoolean
+import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.concurrent.duration._
 import cats.effect.concurrent.Ref
@@ -73,22 +74,27 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
    * @return (Triage, List[Match])
    */
   def findMatches(triage: Triage): (Triage, List[Match]) = {
-    def findMatches(triage: Triage, matches: List[Match]): List[Waiting] => (Triage, List[Match]) = {
+    @tailrec
+    def findMatches(triage: Triage, waitings: List[Waiting], matches: List[Match]): (Triage, List[Match]) = waitings match {
       case w +: restOfWaiting =>
-        findMatch(w, triage).fold(findMatches(triage, matches)(restOfWaiting)) { newMatch =>
-          val stopWaiting: Player => Triage => Triage = { player =>
-            _.updatedWith(player.score)(_.map(_.filterNot(_.player == player)))
-          }
+        findMatch(w, triage) match {
+          case None =>
+            findMatches(triage, restOfWaiting, matches)
 
-          val filterMatch: Player => List[Waiting] => List[Waiting] = { player =>
-            _.filterNot(_.player == player)
-          }
+          case Some(newMatch) =>
+            val stopWaiting: Player => Triage => Triage = { player =>
+              _.updatedWith(player.score)(_.map(_.filterNot(_.player == player)))
+            }
 
-          val nextTriage = (stopWaiting(newMatch.playerA) andThen stopWaiting(newMatch.playerB))(triage)
-          val nextRestOfWaiting = (filterMatch(newMatch.playerA) andThen filterMatch(newMatch.playerB))(restOfWaiting)
+            val filterMatch: Player => List[Waiting] => List[Waiting] = { player =>
+              _.filterNot(_.player == player)
+            }
 
-          issueMatchEvent(newMatch)
-          findMatches(nextTriage, matches :+ newMatch)(nextRestOfWaiting)
+            val nextTriage = (stopWaiting(newMatch.playerA) andThen stopWaiting(newMatch.playerB))(triage)
+            val nextRestOfWaiting = (filterMatch(newMatch.playerA) andThen filterMatch(newMatch.playerB))(restOfWaiting)
+
+            issueMatchEvent(newMatch)
+            findMatches(nextTriage, nextRestOfWaiting, matches :+ newMatch)
         }
 
       case _ =>
@@ -96,7 +102,7 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
     }
 
     val waitings = triage.values.flatten.toList.sortWith(_.player.score > _.player.score)
-    findMatches(triage, Nil)(waitings)
+    findMatches(triage, waitings, Nil)
   }
 
   def findMatch(waiting: Waiting, triage: Triage): Option[Match] = {
