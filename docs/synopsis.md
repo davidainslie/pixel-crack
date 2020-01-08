@@ -58,7 +58,7 @@ $ sbt '; set javaOptions ++= Seq("-Dlog.level=debug", "-Dplayers.per.tick=2", "-
 Appendum
 --------
 
-The approach that unfolded involved a scheduler issuing new players onto a queue which was periodically emptied into a **triage** of *waiting* players that couldbe **matched**. Upon a **match** an event would be fired to a queue of matches which again are periodically reduced by **completing** matches meaning theplayers would once again be waiting for another match. The [spec](introduction.md) mentions the idea of a player being in either a**Waiting** or **Playing** state. However, as the fold evolved, these states seemed redundant, as a player is either in the waiting queue; in triage (where they could be selected for a match); or are in a game i.e. the match queue.
+The approach that unfolded involved a scheduler issuing new players onto a queue which was periodically emptied into a **triage** of *waiting* players that couldbe **matched**. Upon a **match** an event would be fired to a queue of matches which again are periodically reduced by **completing** matches meaning theplayers would once again be waiting for another match. The [spec](introduction.md) mentions the idea of a player being in either a **Waiting** or **Playing** state. However, as the fold evolved, these states seemed redundant, as a player is either in the waiting queue; in triage (where they could be selected for a match); or are in a game i.e. the match queue.
 
 ![Matching](matching.png)
 
