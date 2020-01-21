@@ -4,16 +4,15 @@ import java.util.concurrent.atomic.AtomicBoolean
 import scala.collection.mutable.ListBuffer
 import cats.effect.concurrent.Ref
 import cats.effect.laws.util.TestContext
-import cats.effect.{ContextShift, Fiber, IO, Timer}
+import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import monocle.macros.syntax.lens._
-import org.mockito.scalatest.MockitoSugar
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.{Inspectors, OneInstancePerTest}
 import com.backwards.pixel.ScoreNumeric._
 
-class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest with Inspectors with MockitoSugar {
+class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest with Inspectors {
   val ec: TestContext = TestContext()
   implicit val contextShift: ContextShift[IO] = ec.contextShift[IO]
   implicit val timer: Timer[IO] = IO.timer(ec)
@@ -65,8 +64,7 @@ class ControllerSpec extends AnyWordSpec with Matchers with OneInstancePerTest w
   )
 
   val controller: Controller = new Controller(config, issueMatchEvent) {
-    override def startMatching(matching: IO[(Triage, List[Match])]): (Fiber[IO, (Triage, List[Match])], Matching) =
-      mock[Fiber[IO, (Triage, List[Match])]] -> new AtomicBoolean(false)
+    override lazy val running = new AtomicBoolean(false)
   }
 
   import controller._

@@ -5,7 +5,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.concurrent.duration._
 import cats.effect.concurrent.Ref
-import cats.effect.{Concurrent, Fiber, IO, Timer}
+import cats.effect.{Concurrent, IO, Timer}
 import cats.implicits._
 import com.backwards.pixel.ScoreNumeric._
 
@@ -16,7 +16,8 @@ import com.backwards.pixel.ScoreNumeric._
  * multiple parallel threads for instance). */
 class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concurrent[IO], Timer: Timer[IO]) {
   type Triage = Map[Score, List[Waiting]]
-  type Matching = AtomicBoolean
+
+  lazy val running = new AtomicBoolean(true)
 
   val receive: Input => Unit = {
     case w: Waiting =>
@@ -34,16 +35,20 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
   private val waitingQueue: Ref[IO, mutable.Queue[Waiting]] =
     Ref.unsafe[IO, mutable.Queue[Waiting]](mutable.Queue.empty[Waiting])
 
-  private val matching: (Fiber[IO, (Triage, List[Match])], Matching) =
-    startMatching {
-      IO(scribe info "Begin matching...") *> doMatch(Ref.unsafe[IO, Triage](Map.empty))
+  Ref.of[IO, Triage](Map.empty) flatMap { triage =>
+    if (running.get) {
+      scribe info "Begin matching..."
+
+      Concurrent start doMatch(triage) map { f =>
+        sys addShutdownHook {
+          f.cancel
+          running set false
+        }
+      }
+    } else {
+      IO.unit
     }
-
-  def startMatching(matching: IO[(Triage, List[Match])]): (Fiber[IO, (Triage, List[Match])], Matching) = {
-    sys addShutdownHook this.matching.bimap(_.cancel, _ set false)
-
-    Concurrent.start(matching).unsafeRunSync -> new AtomicBoolean(true)
-  }
+  } unsafeRunSync
 
   def waitingQueueSnapshot: List[Waiting] =
     waitingQueue.get.map(_.toList).unsafeRunSync
@@ -56,8 +61,7 @@ class Controller(config: Config, out: Output => Unit)(implicit Concurrent: Concu
       }
       _ <- triage update add(waitings)
       matches <- triage modify findMatches
-      (_, isMatching) = matching.map(_.get)
-      triageAndMatches <- if (isMatching) IO.sleep(1 second) *> doMatch(triage) else triage.get.map(_ -> matches)
+      triageAndMatches <- if (running.get) IO.sleep(1 second) *> doMatch(triage) else triage.get.map(_ -> matches)
     } yield triageAndMatches
 
   def add(waitings: Seq[Waiting])(triage: Triage): Triage =
